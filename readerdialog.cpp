@@ -30,13 +30,9 @@ void ReaderMenuDialog::setupUI() {
 
     m_btnRegister = new QPushButton("Регистрация читателя");
     m_btnDelete   = new QPushButton("Удалить по фамилии");
-    m_surnameEdit = new QLineEdit();
-    m_surnameEdit->setPlaceholderText("Введите фамилию...");
-    m_surnameEdit->setMaximumWidth(220);
 
     topLayout->addWidget(m_btnRegister);
     topLayout->addWidget(m_btnDelete);
-    topLayout->addWidget(m_surnameEdit);
     topLayout->addStretch();
     mainLayout->addLayout(topLayout);
 
@@ -108,22 +104,27 @@ void ReaderMenuDialog::onRegisterReader() {
 }
 
 void ReaderMenuDialog::onRemoveReaderBySurname() {
-    QString surname = m_surnameEdit->text().trimmed().toLower();
-    if (surname.isEmpty()) {
-        QMessageBox::warning(this, "Ошибка ввода", "Введите фамилию для поиска.");
-        return;
+    // Открываем отдельное модальное окно для ввода фамилии
+    bool ok;
+    QString surname = QInputDialog::getText(this, "Удаление читателя",
+                                            "Введите фамилию для поиска и удаления:", QLineEdit::Normal, "", &ok);
+
+    if (!ok || surname.trimmed().isEmpty()) {
+        return; // Пользователь нажал "Отмена" или ввёл пустую строку
     }
+
+    QString searchQuery = surname.trimmed().toLower();
 
     const auto& users = m_catalog.getUsers();
     auto it = std::find_if(users.begin(), users.end(), [&](const User& u){
-        return QString::fromStdString(u.getFullName()).toLower().contains(surname);
+        return QString::fromStdString(u.getFullName()).toLower().contains(searchQuery);
     });
 
     if (it != users.end()) {
         m_catalog.removeUser(it->getUserId());
         outputReader();
         m_historyModel->removeRows(0, m_historyModel->rowCount());
-        QMessageBox::information(this, "Успех", "Читатель удалён.");
+        QMessageBox::information(this, "Успех", "Читатель успешно удалён из системы.");
     } else {
         QMessageBox::information(this, "Информация", "Читатель с такой фамилией не найден.");
     }

@@ -31,5 +31,4 @@ private:
     QTableView* m_historyTable;
     QPushButton* m_btnRegister;
     QPushButton* m_btnDelete;
-    QLineEdit* m_surnameEdit;
 };
