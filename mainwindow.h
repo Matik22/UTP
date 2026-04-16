@@ -1,23 +1,39 @@
-#ifndef MAINWINDOW_H
-#define MAINWINDOW_H
-
+#pragma once
 #include <QMainWindow>
+#include <QStandardItemModel>
+#include <QSortFilterProxyModel>
+#include <QTableView>      // <-- Добавлено
+#include <QPushButton>     // <-- Добавлено
+#include "catalog.h"
+// В начало файла
+class ReaderMenuDialog;
+class QPushButton;
 
-QT_BEGIN_NAMESPACE
-namespace Ui {
-class MainWindow;
-}
-QT_END_NAMESPACE
-
-class MainWindow : public QMainWindow
-{
+class MainWindow : public QMainWindow {
     Q_OBJECT
-
 public:
-    explicit MainWindow(QWidget *parent = nullptr);
+    explicit MainWindow(QWidget* parent = nullptr);
     ~MainWindow() override;
 
+private slots:
+    void onAddBook();
+    void onSaveData();
+    void onRemoveBookById();
+
 private:
-    Ui::MainWindow *ui;
+    void setupUI();
+    void refreshTable();
+
+    Catalog m_catalog;
+    QStandardItemModel* m_sourceModel;
+    QSortFilterProxyModel* m_proxyModel;
+
+    QTableView* m_tableView;
+    QPushButton* m_btnAdd;
+    QPushButton* m_btnSave;
+    // В private секцию
+    void openReaderMenu(); // ← Новый слот
+    QPushButton* m_btnReaders; // ← Новая кнопка
+    QPushButton* m_btnDeleteBook;
+
 };
-#endif // MAINWINDOW_H
