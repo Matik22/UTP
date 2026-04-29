@@ -265,6 +265,7 @@ void MainWindow::onImportBooks() {
  int added = 0;
  int skipped = 0;
  QTextStream in(&file);
+ in.setCodec("UTF-8");
 
  while (!in.atEnd()) {
   QString line = in.readLine().trimmed();
