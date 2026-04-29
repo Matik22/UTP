@@ -14,6 +14,9 @@
 #include <QInputDialog>
 #include <QLabel>
 #include <QComboBox>
+#include <QFileDialog>
+#include <QFile>
+#include <QTextStream>
 #include "issuedialog.h"
 #include "chartwidget.h"
 #include "user.h"
@@ -85,6 +88,10 @@ void MainWindow::setupBooksPage() {
 
  m_btnAdd = new QPushButton("Добавить книгу");
  topLayout->addWidget(m_btnAdd);
+
+ m_btnImport = new QPushButton("Загрузить из файла");
+ topLayout->addWidget(m_btnImport);
+ QObject::connect(m_btnImport, &QPushButton::clicked, this, &MainWindow::onImportBooks);
 
  m_btnIssueBook = new QPushButton("Выдать книгу");
  topLayout->addWidget(m_btnIssueBook);
@@ -244,6 +251,57 @@ void MainWindow::onSearchChanged() {
  m_proxyModel->setFilterFixedString(text);
 }
 
+void MainWindow::onImportBooks() {
+ QString filename = QFileDialog::getOpenFileName(this, "Загрузить список книг", "",
+  "Текстовые файлы (*.txt);;Все файлы (*)");
+ if (filename.isEmpty()) return;
+
+ QFile file(filename);
+ if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+  QMessageBox::warning(this, "Ошибка", "Не удалось открыть файл.");
+  return;
+ }
+
+ int added = 0;
+ int skipped = 0;
+ QTextStream in(&file);
+
+ while (!in.atEnd()) {
+  QString line = in.readLine().trimmed();
+  if (line.isEmpty() || line.startsWith('#')) continue;
+
+  QStringList parts = line.split("|");
+  if (parts.size() < 5) {
+   skipped++;
+   continue;
+  }
+
+  QString title = parts[0].trimmed();
+  QString author = parts[1].trimmed();
+  QString publisher = parts[2].trimmed();
+  bool ok = false;
+  int year = parts[3].trimmed().toInt(&ok);
+  QString genre = parts[4].trimmed();
+
+  if (title.isEmpty() || author.isEmpty() || !ok) {
+   skipped++;
+   continue;
+  }
+
+  std::string autoId = m_catalog.generateBookId(genre.toStdString());
+  Book newBook(autoId, title.toStdString(), author.toStdString(),
+               publisher.toStdString(), year, genre.toStdString());
+  m_catalog.addBook(newBook);
+  added++;
+ }
+
+ file.close();
+ refreshTable();
+
+ QMessageBox::information(this, "Импорт завершён",
+  QString("Добавлено: %1\nПропущено: %2").arg(added).arg(skipped));
+}
+
 void MainWindow::refreshTable() {
  m_sourceModel->removeRows(0, m_sourceModel->rowCount());
  const auto& books = m_catalog.getBooks();
@@ -369,7 +427,6 @@ void MainWindow::refreshChart() {
  int dataIdx = m_chartDataCombo ? m_chartDataCombo->currentIndex() : 0;
 
  if (dataIdx == 0) {
-  // По жанрам
   const auto& books = m_catalog.getBooks();
   QMap<QString, double> genreCount;
   for (const auto& b : books) {
@@ -379,7 +436,6 @@ void MainWindow::refreshChart() {
   }
   m_chartWidget->setData(genreCount);
  } else {
-  // В наличии / На руках
   const auto& books = m_catalog.getBooks();
   double available = 0;
   double issued = 0;

@@ -31,6 +31,7 @@ private slots:
  void onReaderSelectionChanged(const QModelIndex& current, const QModelIndex& previous);
  void onChartTypeChanged();
  void onChartDataChanged();
+ void onImportBooks();
 
 private:
  void setupUI();
@@ -56,6 +57,7 @@ private:
  QPushButton* m_btnDeleteBook;
  QPushButton* m_btnIssueBook;
  QPushButton* m_btnChart;
+ QPushButton* m_btnImport;
  QLineEdit* m_searchEdit;
  QComboBox* m_searchColumn;
 
