@@ -13,7 +13,7 @@ user.cpp \
 issuerecord.cpp \
 mainwindow.cpp \
 issuedialog.cpp \
-piechartwidget.cpp
+chartwidget.cpp
 
 HEADERS += \
 book.h \
@@ -22,7 +22,7 @@ user.h \
 issuerecord.h \
 mainwindow.h \
 issuedialog.h \
-piechartwidget.h
+chartwidget.h
 
 win32:CONFIG -= console
 QMAKE_CXXFLAGS += -Wall -Wextra -pedantic

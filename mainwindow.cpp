@@ -15,13 +15,14 @@
 #include <QLabel>
 #include <QComboBox>
 #include "issuedialog.h"
-#include "piechartwidget.h"
+#include "chartwidget.h"
 #include "user.h"
 
 MainWindow::MainWindow(QWidget* parent)
  : QMainWindow(parent), m_sourceModel(nullptr), m_proxyModel(nullptr),
    m_searchEdit(nullptr), m_searchColumn(nullptr),
-   m_userModel(nullptr), m_userProxy(nullptr), m_historyModel(nullptr) {
+   m_userModel(nullptr), m_userProxy(nullptr), m_historyModel(nullptr),
+   m_chartWidget(nullptr), m_chartTypeCombo(nullptr), m_chartDataCombo(nullptr) {
  setupUI();
  m_catalog.loadData();
  refreshTable();
@@ -38,6 +39,7 @@ void MainWindow::setupUI() {
 
  setupBooksPage();
  setupReadersPage();
+ setupChartPage();
 
  setStyleSheet(
   "QMainWindow, QWidget { background-color: #2b2b2b; color: #ffffff; }"
@@ -88,9 +90,9 @@ void MainWindow::setupBooksPage() {
  topLayout->addWidget(m_btnIssueBook);
  QObject::connect(m_btnIssueBook, &QPushButton::clicked, this, &MainWindow::onIssueBook);
 
- m_btnChart = new QPushButton("Диаграмма");
+ m_btnChart = new QPushButton("Статистика");
  topLayout->addWidget(m_btnChart);
- QObject::connect(m_btnChart, &QPushButton::clicked, this, &MainWindow::onShowChart);
+ QObject::connect(m_btnChart, &QPushButton::clicked, this, &MainWindow::onSwitchToChart);
 
  topLayout->addStretch();
  m_btnSave = new QPushButton("Сохранить");
@@ -184,6 +186,39 @@ void MainWindow::setupReadersPage() {
  m_stack->addWidget(m_readersPage);
 }
 
+void MainWindow::setupChartPage() {
+ m_chartPage = new QWidget();
+ QVBoxLayout* mainLayout = new QVBoxLayout(m_chartPage);
+
+ QHBoxLayout* topLayout = new QHBoxLayout();
+ m_btnBackFromChart = new QPushButton("Назад");
+ topLayout->addWidget(m_btnBackFromChart);
+ QObject::connect(m_btnBackFromChart, &QPushButton::clicked, this, &MainWindow::onSwitchToCatalog);
+
+ topLayout->addWidget(new QLabel("Тип диаграммы:"));
+ m_chartTypeCombo = new QComboBox();
+ m_chartTypeCombo->addItems({"Круговая", "Столбчатая", "Линейчатая"});
+ topLayout->addWidget(m_chartTypeCombo);
+
+ topLayout->addWidget(new QLabel("Данные:"));
+ m_chartDataCombo = new QComboBox();
+ m_chartDataCombo->addItems({"По жанрам", "В наличии / На руках"});
+ topLayout->addWidget(m_chartDataCombo);
+
+ topLayout->addStretch();
+ mainLayout->addLayout(topLayout);
+
+ m_chartWidget = new ChartWidget(m_chartPage);
+ mainLayout->addWidget(m_chartWidget);
+
+ QObject::connect(m_chartTypeCombo, QOverload<int>::of(&QComboBox::currentIndexChanged),
+                  this, &MainWindow::onChartTypeChanged);
+ QObject::connect(m_chartDataCombo, QOverload<int>::of(&QComboBox::currentIndexChanged),
+                  this, &MainWindow::onChartDataChanged);
+
+ m_stack->addWidget(m_chartPage);
+}
+
 // === Навигация ===
 
 void MainWindow::onSwitchToReaders() {
@@ -195,6 +230,11 @@ void MainWindow::onSwitchToCatalog() {
  m_stack->setCurrentWidget(m_booksPage);
 }
 
+void MainWindow::onSwitchToChart() {
+ refreshChart();
+ m_stack->setCurrentWidget(m_chartPage);
+}
+
 // === Каталог книг ===
 
 void MainWindow::onSearchChanged() {
@@ -202,37 +242,6 @@ void MainWindow::onSearchChanged() {
  int column = m_searchColumn->currentIndex();
  m_proxyModel->setFilterKeyColumn(column);
  m_proxyModel->setFilterFixedString(text);
-}
-
-void MainWindow::onShowChart() {
- const auto& books = m_catalog.getBooks();
- if (books.empty()) {
-  QMessageBox::information(this, "Диаграмма", "Каталог пуст — нет данных для диаграммы.");
-  return;
- }
-
- QMap<QString, double> genreCount;
- for (const auto& b : books) {
-  QString genre = QString::fromStdString(b.getGenre());
-  if (genre.isEmpty()) genre = "Без жанра";
-  genreCount[genre] += 1;
- }
-
- QDialog* dialog = new QDialog(this);
- dialog->setWindowTitle("Диаграмма: Книги по жанрам");
- dialog->resize(600, 500);
-
- QVBoxLayout* layout = new QVBoxLayout(dialog);
- PieChartWidget* chart = new PieChartWidget(dialog);
- chart->setData(genreCount);
- layout->addWidget(chart);
-
- QPushButton* btnClose = new QPushButton("Закрыть", dialog);
- QObject::connect(btnClose, &QPushButton::clicked, dialog, &QDialog::close);
- layout->addWidget(btnClose);
-
- dialog->exec();
- delete dialog;
 }
 
 void MainWindow::refreshTable() {
@@ -336,6 +345,55 @@ void MainWindow::onIssueBook() {
  if (dialog.exec() == QDialog::Accepted) {
   refreshTable();
   QMessageBox::information(this, "Успех", "Книга успешно выдана читателю.");
+ }
+}
+
+// === Страница статистики ===
+
+void MainWindow::onChartTypeChanged() {
+ if (!m_chartWidget) return;
+ int idx = m_chartTypeCombo->currentIndex();
+ m_chartWidget->setChartType(static_cast<ChartWidget::ChartType>(idx));
+}
+
+void MainWindow::onChartDataChanged() {
+ if (!m_chartWidget) return;
+ int idx = m_chartDataCombo->currentIndex();
+ m_chartWidget->setDataMode(static_cast<ChartWidget::DataMode>(idx));
+ refreshChart();
+}
+
+void MainWindow::refreshChart() {
+ if (!m_chartWidget) return;
+
+ int dataIdx = m_chartDataCombo ? m_chartDataCombo->currentIndex() : 0;
+
+ if (dataIdx == 0) {
+  // По жанрам
+  const auto& books = m_catalog.getBooks();
+  QMap<QString, double> genreCount;
+  for (const auto& b : books) {
+   QString genre = QString::fromStdString(b.getGenre());
+   if (genre.isEmpty()) genre = "Без жанра";
+   genreCount[genre] += 1;
+  }
+  m_chartWidget->setData(genreCount);
+ } else {
+  // В наличии / На руках
+  const auto& books = m_catalog.getBooks();
+  double available = 0;
+  double issued = 0;
+  for (const auto& b : books) {
+   if (m_catalog.isBookIssued(b.getBookId())) {
+    issued += 1;
+   } else {
+    available += 1;
+   }
+  }
+  QMap<QString, double> availData;
+  availData["В наличии"] = available;
+  availData["На руках"] = issued;
+  m_chartWidget->setData(availData);
  }
 }
 

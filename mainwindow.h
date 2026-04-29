@@ -9,8 +9,7 @@
 #include <QStackedWidget>
 #include "catalog.h"
 
-class ReaderMenuDialog;
-class QPushButton;
+class ChartWidget;
 
 class MainWindow : public QMainWindow {
  Q_OBJECT
@@ -24,19 +23,23 @@ private slots:
  void onRemoveBookById();
  void onIssueBook();
  void onSearchChanged();
- void onShowChart();
  void onSwitchToReaders();
  void onSwitchToCatalog();
+ void onSwitchToChart();
  void onRegisterReader();
  void onRemoveReaderBySurname();
  void onReaderSelectionChanged(const QModelIndex& current, const QModelIndex& previous);
+ void onChartTypeChanged();
+ void onChartDataChanged();
 
 private:
  void setupUI();
  void setupBooksPage();
  void setupReadersPage();
+ void setupChartPage();
  void refreshTable();
  void refreshReadersTable();
+ void refreshChart();
  void showReaderHistory(const std::string& userId);
 
  Catalog m_catalog;
@@ -66,4 +69,11 @@ private:
  QPushButton* m_btnBack;
  QPushButton* m_btnRegister;
  QPushButton* m_btnDeleteReader;
+
+ // Страница статистики
+ QWidget* m_chartPage;
+ ChartWidget* m_chartWidget;
+ QPushButton* m_btnBackFromChart;
+ QComboBox* m_chartTypeCombo;
+ QComboBox* m_chartDataCombo;
 };
