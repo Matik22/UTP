@@ -23,6 +23,7 @@ private slots:
  void onRemoveBookById();
  void onIssueBook();
  void onSearchChanged();
+ void onShowChart();
 
 private:
  void setupUI();
@@ -41,6 +42,7 @@ private:
  QPushButton* m_btnDeleteBook;
 
  QPushButton* m_btnIssueBook;
+ QPushButton* m_btnChart;
 
  QLineEdit* m_searchEdit;
  QComboBox* m_searchColumn;

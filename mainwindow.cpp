@@ -16,6 +16,7 @@
 #include <QLabel>
 #include "issuedialog.h"
 #include <QComboBox>
+#include "piechartwidget.h"
 
 MainWindow::MainWindow(QWidget* parent)
  : QMainWindow(parent), m_sourceModel(nullptr), m_proxyModel(nullptr),
@@ -40,16 +41,20 @@ void MainWindow::setupUI() {
  m_btnSave = new QPushButton("Сохранить");
  m_btnDeleteBook = new QPushButton("Удалить книгу");
  topLayout->addWidget(m_btnDeleteBook);
- connect(m_btnDeleteBook, &QPushButton::clicked, this, &MainWindow::onRemoveBookById);
+ QObject::connect(m_btnDeleteBook, &QPushButton::clicked, this, &MainWindow::onRemoveBookById);
 
  m_btnReaders = new QPushButton("Читатели");
  topLayout->addWidget(m_btnReaders);
- connect(m_btnReaders, &QPushButton::clicked, this, &MainWindow::openReaderMenu);
+ QObject::connect(m_btnReaders, &QPushButton::clicked, this, &MainWindow::openReaderMenu);
  topLayout->addWidget(m_btnAdd);
 
  m_btnIssueBook = new QPushButton("Выдать книгу");
  topLayout->addWidget(m_btnIssueBook);
- connect(m_btnIssueBook, &QPushButton::clicked, this, &MainWindow::onIssueBook);
+ QObject::connect(m_btnIssueBook, &QPushButton::clicked, this, &MainWindow::onIssueBook);
+
+ m_btnChart = new QPushButton("Диаграмма");
+ topLayout->addWidget(m_btnChart);
+ QObject::connect(m_btnChart, &QPushButton::clicked, this, &MainWindow::onShowChart);
 
  topLayout->addStretch();
  topLayout->addWidget(m_btnSave);
@@ -66,8 +71,8 @@ void MainWindow::setupUI() {
  searchLayout->addWidget(m_searchEdit);
  mainLayout->addLayout(searchLayout);
 
- connect(m_searchEdit, &QLineEdit::textChanged, this, &MainWindow::onSearchChanged);
- connect(m_searchColumn, QOverload<int>::of(&QComboBox::currentIndexChanged),
+ QObject::connect(m_searchEdit, &QLineEdit::textChanged, this, &MainWindow::onSearchChanged);
+ QObject::connect(m_searchColumn, QOverload<int>::of(&QComboBox::currentIndexChanged),
          this, &MainWindow::onSearchChanged);
 
  m_tableView = new QTableView();
@@ -86,10 +91,36 @@ void MainWindow::setupUI() {
  m_tableView->setSelectionBehavior(QAbstractItemView::SelectRows);
  mainLayout->addWidget(m_tableView);
 
- connect(m_btnAdd, &QPushButton::clicked, this, &MainWindow::onAddBook);
- connect(m_btnSave, &QPushButton::clicked, this, &MainWindow::onSaveData);
+ QObject::connect(m_btnAdd, &QPushButton::clicked, this, &MainWindow::onAddBook);
+ QObject::connect(m_btnSave, &QPushButton::clicked, this, &MainWindow::onSaveData);
 
  statusBar()->showMessage("Система готова. Кликните по заголовку для сортировки.");
+
+ setStyleSheet(
+  "QMainWindow, QWidget { background-color: #2b2b2b; color: #ffffff; }"
+  "QTableView { background-color: #3c3c3c; color: #ffffff; border: 1px solid #555; gridline-color: #555; alternate-background-color: #333333; }"
+  "QTableView::item { color: #ffffff; }"
+  "QTableView::item:selected { background-color: #0d47a1; }"
+  "QHeaderView::section { background-color: #2b2b2b; color: #cccccc; padding: 6px; border: none; border-bottom: 1px solid #555; }"
+  "QPushButton { background-color: #0d47a1; color: #ffffff; border: none; border-radius: 3px; padding: 6px 12px; font-weight: bold; }"
+  "QPushButton:hover { background-color: #1565c0; }"
+  "QPushButton:pressed { background-color: #0a3570; }"
+  "QPushButton:disabled { background-color: #444444; color: #888888; }"
+  "QLineEdit { background-color: #3c3c3c; color: #ffffff; border: 1px solid #555; border-radius: 3px; padding: 4px 8px; }"
+  "QLineEdit::placeholder { color: #888888; }"
+  "QComboBox { background-color: #3c3c3c; color: #ffffff; border: 1px solid #555; border-radius: 3px; padding: 4px 8px; }"
+  "QComboBox::drop-down { border: none; }"
+  "QComboBox QAbstractItemView { background-color: #3c3c3c; color: #ffffff; selection-background-color: #0d47a1; }"
+  "QComboBox::down-arrow { image: none; border: none; }"
+  "QLabel { color: #cccccc; }"
+  "QStatusBar { background-color: #2b2b2b; color: #aaaaaa; }"
+  "QScrollBar:vertical { background-color: #2b2b2b; width: 10px; }"
+  "QScrollBar::handle:vertical { background-color: #555; border-radius: 4px; min-height: 20px; }"
+  "QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height: 0; }"
+  "QScrollBar:horizontal { background-color: #2b2b2b; height: 10px; }"
+  "QScrollBar::handle:horizontal { background-color: #555; border-radius: 4px; min-width: 20px; }"
+  "QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal { width: 0; }"
+ );
 }
 
 void MainWindow::onSearchChanged() {
@@ -97,6 +128,37 @@ void MainWindow::onSearchChanged() {
  int column = m_searchColumn->currentIndex();
  m_proxyModel->setFilterKeyColumn(column);
  m_proxyModel->setFilterFixedString(text);
+}
+
+void MainWindow::onShowChart() {
+ const auto& books = m_catalog.getBooks();
+ if (books.empty()) {
+  QMessageBox::information(this, "Диаграмма", "Каталог пуст — нет данных для диаграммы.");
+  return;
+ }
+
+ QMap<QString, double> genreCount;
+ for (const auto& b : books) {
+  QString genre = QString::fromStdString(b.getGenre());
+  if (genre.isEmpty()) genre = "Без жанра";
+  genreCount[genre] += 1;
+ }
+
+ QDialog* dialog = new QDialog(this);
+ dialog->setWindowTitle("Диаграмма: Книги по жанрам");
+ dialog->resize(600, 500);
+
+ QVBoxLayout* layout = new QVBoxLayout(dialog);
+ PieChartWidget* chart = new PieChartWidget(dialog);
+ chart->setData(genreCount);
+ layout->addWidget(chart);
+
+ QDialogButtonBox* btnBox = new QDialogButtonBox(QDialogButtonBox::Close, dialog);
+ layout->addWidget(btnBox);
+ QObject::connect(btnBox, SIGNAL(rejected()), dialog, SLOT(close()));
+
+ dialog->exec();
+ delete dialog;
 }
 
 void MainWindow::refreshTable() {
