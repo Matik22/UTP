@@ -153,9 +153,9 @@ void MainWindow::onShowChart() {
  chart->setData(genreCount);
  layout->addWidget(chart);
 
- QDialogButtonBox* btnBox = new QDialogButtonBox(QDialogButtonBox::Close, dialog);
- layout->addWidget(btnBox);
- QObject::connect(btnBox, SIGNAL(rejected()), dialog, SLOT(close()));
+ QPushButton* btnClose = new QPushButton("Закрыть", dialog);
+ QObject::connect(btnClose, &QPushButton::clicked, dialog, &QDialog::close);
+ layout->addWidget(btnClose);
 
  dialog->exec();
  delete dialog;
