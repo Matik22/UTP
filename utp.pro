@@ -12,7 +12,6 @@ catalog.cpp \
 user.cpp \
 issuerecord.cpp \
 mainwindow.cpp \
-readerdialog.cpp \
 issuedialog.cpp \
 piechartwidget.cpp
 
@@ -22,7 +21,6 @@ catalog.h \
 user.h \
 issuerecord.h \
 mainwindow.h \
-readerdialog.h \
 issuedialog.h \
 piechartwidget.h
 

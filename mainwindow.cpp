@@ -11,16 +11,17 @@
 #include <QSpinBox>
 #include <QDialogButtonBox>
 #include <QDate>
-#include "readerdialog.h"
 #include <QInputDialog>
 #include <QLabel>
-#include "issuedialog.h"
 #include <QComboBox>
+#include "issuedialog.h"
 #include "piechartwidget.h"
+#include "user.h"
 
 MainWindow::MainWindow(QWidget* parent)
  : QMainWindow(parent), m_sourceModel(nullptr), m_proxyModel(nullptr),
-   m_searchEdit(nullptr), m_searchColumn(nullptr) {
+   m_searchEdit(nullptr), m_searchColumn(nullptr),
+   m_userModel(nullptr), m_userProxy(nullptr), m_historyModel(nullptr) {
  setupUI();
  m_catalog.loadData();
  refreshTable();
@@ -32,20 +33,55 @@ void MainWindow::setupUI() {
  setWindowTitle("АРМ Библиотекаря | Учёт фонда");
  resize(1050, 650);
 
- QWidget* centralWidget = new QWidget(this);
- setCentralWidget(centralWidget);
- QVBoxLayout* mainLayout = new QVBoxLayout(centralWidget);
+ m_stack = new QStackedWidget(this);
+ setCentralWidget(m_stack);
+
+ setupBooksPage();
+ setupReadersPage();
+
+ setStyleSheet(
+  "QMainWindow, QWidget { background-color: #2b2b2b; color: #ffffff; }"
+  "QTableView { background-color: #3c3c3c; color: #ffffff; border: 1px solid #555; gridline-color: #555; alternate-background-color: #333333; }"
+  "QTableView::item { color: #ffffff; }"
+  "QTableView::item:selected { background-color: #0d47a1; }"
+  "QHeaderView::section { background-color: #2b2b2b; color: #cccccc; padding: 6px; border: none; border-bottom: 1px solid #555; }"
+  "QPushButton { background-color: #0d47a1; color: #ffffff; border: none; border-radius: 3px; padding: 6px 12px; font-weight: bold; }"
+  "QPushButton:hover { background-color: #1565c0; }"
+  "QPushButton:pressed { background-color: #0a3570; }"
+  "QPushButton:disabled { background-color: #444444; color: #888888; }"
+  "QLineEdit { background-color: #3c3c3c; color: #ffffff; border: 1px solid #555; border-radius: 3px; padding: 4px 8px; }"
+  "QLineEdit::placeholder { color: #888888; }"
+  "QComboBox { background-color: #3c3c3c; color: #ffffff; border: 1px solid #555; border-radius: 3px; padding: 4px 8px; }"
+  "QComboBox::drop-down { border: none; }"
+  "QComboBox QAbstractItemView { background-color: #3c3c3c; color: #ffffff; selection-background-color: #0d47a1; }"
+  "QComboBox::down-arrow { image: none; border: none; }"
+  "QLabel { color: #cccccc; }"
+  "QStatusBar { background-color: #2b2b2b; color: #aaaaaa; }"
+  "QScrollBar:vertical { background-color: #2b2b2b; width: 10px; }"
+  "QScrollBar::handle:vertical { background-color: #555; border-radius: 4px; min-height: 20px; }"
+  "QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height: 0; }"
+  "QScrollBar:horizontal { background-color: #2b2b2b; height: 10px; }"
+  "QScrollBar::handle:horizontal { background-color: #555; border-radius: 4px; min-width: 20px; }"
+  "QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal { width: 0; }"
+ );
+
+ statusBar()->showMessage("Система готова. Кликните по заголовку для сортировки.");
+}
+
+void MainWindow::setupBooksPage() {
+ m_booksPage = new QWidget();
+ QVBoxLayout* mainLayout = new QVBoxLayout(m_booksPage);
 
  QHBoxLayout* topLayout = new QHBoxLayout();
- m_btnAdd = new QPushButton("Добавить книгу");
- m_btnSave = new QPushButton("Сохранить");
  m_btnDeleteBook = new QPushButton("Удалить книгу");
  topLayout->addWidget(m_btnDeleteBook);
  QObject::connect(m_btnDeleteBook, &QPushButton::clicked, this, &MainWindow::onRemoveBookById);
 
  m_btnReaders = new QPushButton("Читатели");
  topLayout->addWidget(m_btnReaders);
- QObject::connect(m_btnReaders, &QPushButton::clicked, this, &MainWindow::openReaderMenu);
+ QObject::connect(m_btnReaders, &QPushButton::clicked, this, &MainWindow::onSwitchToReaders);
+
+ m_btnAdd = new QPushButton("Добавить книгу");
  topLayout->addWidget(m_btnAdd);
 
  m_btnIssueBook = new QPushButton("Выдать книгу");
@@ -57,6 +93,7 @@ void MainWindow::setupUI() {
  QObject::connect(m_btnChart, &QPushButton::clicked, this, &MainWindow::onShowChart);
 
  topLayout->addStretch();
+ m_btnSave = new QPushButton("Сохранить");
  topLayout->addWidget(m_btnSave);
  mainLayout->addLayout(topLayout);
 
@@ -94,34 +131,71 @@ void MainWindow::setupUI() {
  QObject::connect(m_btnAdd, &QPushButton::clicked, this, &MainWindow::onAddBook);
  QObject::connect(m_btnSave, &QPushButton::clicked, this, &MainWindow::onSaveData);
 
- statusBar()->showMessage("Система готова. Кликните по заголовку для сортировки.");
-
- setStyleSheet(
-  "QMainWindow, QWidget { background-color: #2b2b2b; color: #ffffff; }"
-  "QTableView { background-color: #3c3c3c; color: #ffffff; border: 1px solid #555; gridline-color: #555; alternate-background-color: #333333; }"
-  "QTableView::item { color: #ffffff; }"
-  "QTableView::item:selected { background-color: #0d47a1; }"
-  "QHeaderView::section { background-color: #2b2b2b; color: #cccccc; padding: 6px; border: none; border-bottom: 1px solid #555; }"
-  "QPushButton { background-color: #0d47a1; color: #ffffff; border: none; border-radius: 3px; padding: 6px 12px; font-weight: bold; }"
-  "QPushButton:hover { background-color: #1565c0; }"
-  "QPushButton:pressed { background-color: #0a3570; }"
-  "QPushButton:disabled { background-color: #444444; color: #888888; }"
-  "QLineEdit { background-color: #3c3c3c; color: #ffffff; border: 1px solid #555; border-radius: 3px; padding: 4px 8px; }"
-  "QLineEdit::placeholder { color: #888888; }"
-  "QComboBox { background-color: #3c3c3c; color: #ffffff; border: 1px solid #555; border-radius: 3px; padding: 4px 8px; }"
-  "QComboBox::drop-down { border: none; }"
-  "QComboBox QAbstractItemView { background-color: #3c3c3c; color: #ffffff; selection-background-color: #0d47a1; }"
-  "QComboBox::down-arrow { image: none; border: none; }"
-  "QLabel { color: #cccccc; }"
-  "QStatusBar { background-color: #2b2b2b; color: #aaaaaa; }"
-  "QScrollBar:vertical { background-color: #2b2b2b; width: 10px; }"
-  "QScrollBar::handle:vertical { background-color: #555; border-radius: 4px; min-height: 20px; }"
-  "QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height: 0; }"
-  "QScrollBar:horizontal { background-color: #2b2b2b; height: 10px; }"
-  "QScrollBar::handle:horizontal { background-color: #555; border-radius: 4px; min-width: 20px; }"
-  "QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal { width: 0; }"
- );
+ m_stack->addWidget(m_booksPage);
 }
+
+void MainWindow::setupReadersPage() {
+ m_readersPage = new QWidget();
+ QVBoxLayout* mainLayout = new QVBoxLayout(m_readersPage);
+
+ QHBoxLayout* topLayout = new QHBoxLayout();
+ m_btnBack = new QPushButton("Назад");
+ topLayout->addWidget(m_btnBack);
+ QObject::connect(m_btnBack, &QPushButton::clicked, this, &MainWindow::onSwitchToCatalog);
+
+ m_btnRegister = new QPushButton("Регистрация читателя");
+ topLayout->addWidget(m_btnRegister);
+ QObject::connect(m_btnRegister, &QPushButton::clicked, this, &MainWindow::onRegisterReader);
+
+ m_btnDeleteReader = new QPushButton("Удалить по фамилии");
+ topLayout->addWidget(m_btnDeleteReader);
+ QObject::connect(m_btnDeleteReader, &QPushButton::clicked, this, &MainWindow::onRemoveReaderBySurname);
+
+ topLayout->addStretch();
+ mainLayout->addLayout(topLayout);
+
+ QHBoxLayout* tablesLayout = new QHBoxLayout();
+
+ m_userTable = new QTableView();
+ m_userModel = new QStandardItemModel(this);
+ m_userModel->setHorizontalHeaderLabels({"ID", "ФИО", "Телефон"});
+ m_userProxy = new QSortFilterProxyModel(this);
+ m_userProxy->setSourceModel(m_userModel);
+ m_userTable->setModel(m_userProxy);
+ m_userTable->horizontalHeader()->setSectionResizeMode(QHeaderView::Stretch);
+ m_userTable->setAlternatingRowColors(true);
+ m_userTable->setSelectionBehavior(QAbstractItemView::SelectRows);
+ tablesLayout->addWidget(m_userTable, 2);
+
+ m_historyTable = new QTableView();
+ m_historyModel = new QStandardItemModel(this);
+ m_historyModel->setHorizontalHeaderLabels({"ID книги", "Дата выдачи", "Дата возврата", "Статус"});
+ m_historyTable->setModel(m_historyModel);
+ m_historyTable->horizontalHeader()->setSectionResizeMode(QHeaderView::Stretch);
+ m_historyTable->setAlternatingRowColors(true);
+ m_historyTable->setSelectionBehavior(QAbstractItemView::SelectRows);
+ tablesLayout->addWidget(m_historyTable, 1);
+
+ mainLayout->addLayout(tablesLayout);
+
+ QObject::connect(m_userTable->selectionModel(), &QItemSelectionModel::currentRowChanged,
+                  this, &MainWindow::onReaderSelectionChanged);
+
+ m_stack->addWidget(m_readersPage);
+}
+
+// === Навигация ===
+
+void MainWindow::onSwitchToReaders() {
+ refreshReadersTable();
+ m_stack->setCurrentWidget(m_readersPage);
+}
+
+void MainWindow::onSwitchToCatalog() {
+ m_stack->setCurrentWidget(m_booksPage);
+}
+
+// === Каталог книг ===
 
 void MainWindow::onSearchChanged() {
  QString text = m_searchEdit->text();
@@ -257,15 +331,83 @@ void MainWindow::onSaveData() {
  QMessageBox::information(this, "Успех", "Данные сохранены в library_data.txt");
 }
 
-void MainWindow::openReaderMenu() {
- ReaderMenuDialog dialog(m_catalog, this);
- dialog.exec();
-}
-
 void MainWindow::onIssueBook() {
  IssueDialog dialog(m_catalog, this);
  if (dialog.exec() == QDialog::Accepted) {
   refreshTable();
   QMessageBox::information(this, "Успех", "Книга успешно выдана читателю.");
  }
+}
+
+// === Страница читателей ===
+
+void MainWindow::refreshReadersTable() {
+ m_userModel->removeRows(0, m_userModel->rowCount());
+ m_historyModel->removeRows(0, m_historyModel->rowCount());
+ const auto& users = m_catalog.getUsers();
+ for (const auto& u : users) {
+  QList<QStandardItem*> row;
+  row << new QStandardItem(QString::fromStdString(u.getUserId()))
+      << new QStandardItem(QString::fromStdString(u.getFullName()))
+      << new QStandardItem(QString::fromStdString(u.getPhoneNumber()));
+  m_userModel->appendRow(row);
+ }
+}
+
+void MainWindow::showReaderHistory(const std::string& userId) {
+ m_historyModel->removeRows(0, m_historyModel->rowCount());
+ auto history = m_catalog.getUserHistory(userId);
+ for (const auto& rec : history) {
+  QList<QStandardItem*> row;
+  row << new QStandardItem(QString::fromStdString(rec.getBookId()))
+      << new QStandardItem(QString::fromStdString(rec.getIssueDate()))
+      << new QStandardItem(QString::fromStdString(rec.getReturnDate().empty() ? "В обороте" : rec.getReturnDate()))
+      << new QStandardItem(rec.getIsOverdue() ? "Просрочка" : "В норме");
+  m_historyModel->appendRow(row);
+ }
+}
+
+void MainWindow::onRegisterReader() {
+ bool ok;
+ QString fullName = QInputDialog::getText(this, "Регистрация", "ФИО читателя:", QLineEdit::Normal, "", &ok);
+ if (!ok || fullName.trimmed().isEmpty()) return;
+
+ QString phone = QInputDialog::getText(this, "Регистрация", "Номер телефона:", QLineEdit::Normal, "+7", &ok);
+
+ std::string autoId = m_catalog.generateUserId();
+ m_catalog.addUser(User(autoId, fullName.trimmed().toStdString(), phone.trimmed().toStdString()));
+
+ refreshReadersTable();
+ QMessageBox::information(this, "Успех", "Читатель зарегистрирован.");
+}
+
+void MainWindow::onRemoveReaderBySurname() {
+ bool ok;
+ QString surname = QInputDialog::getText(this, "Удаление читателя",
+  "Введите фамилию для удаления:", QLineEdit::Normal, "", &ok);
+
+ if (!ok || surname.trimmed().isEmpty()) return;
+
+ QString searchQuery = surname.trimmed().toLower();
+ const auto& users = m_catalog.getUsers();
+ auto it = std::find_if(users.begin(), users.end(), [&](const User& u){
+  return QString::fromStdString(u.getFullName()).toLower().contains(searchQuery);
+ });
+
+ if (it != users.end()) {
+  m_catalog.removeUser(it->getUserId());
+  refreshReadersTable();
+  QMessageBox::information(this, "Успех", "Читатель успешно удалён из системы.");
+ } else {
+  QMessageBox::information(this, "Информация", "Читателя с такой фамилией в базе нет.");
+ }
+}
+
+void MainWindow::onReaderSelectionChanged(const QModelIndex& current, const QModelIndex&) {
+ if (!current.isValid()) {
+  m_historyModel->removeRows(0, m_historyModel->rowCount());
+  return;
+ }
+ QString userId = m_userModel->item(current.row(), 0)->text();
+ showReaderHistory(userId.toStdString());
 }
