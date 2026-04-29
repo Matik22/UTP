@@ -4,7 +4,7 @@
 class Book {
 public:
     Book();
-    // Конструктор принимает ID один раз
+
     Book(std::string bookId, std::string title, std::string author,
          std::string publisher, int year, std::string genre);
 

@@ -1,7 +1,7 @@
 #include "readerdialog.h"
 #include "catalog.h"
-#include "user.h"          // ← Добавлено
-#include "issuerecord.h"   // ← Добавлено
+#include "user.h"
+#include "issuerecord.h"
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QTableView>
@@ -10,7 +10,7 @@
 #include <QHeaderView>
 #include <QMessageBox>
 #include <QInputDialog>
-#include <algorithm>       // ← Для std::find_if
+#include <algorithm>
 
 ReaderMenuDialog::ReaderMenuDialog(Catalog& catalog, QWidget* parent)
     : QDialog(parent), m_catalog(catalog), m_userModel(nullptr), m_userProxy(nullptr), m_historyModel(nullptr) {
@@ -18,7 +18,7 @@ ReaderMenuDialog::ReaderMenuDialog(Catalog& catalog, QWidget* parent)
     outputReader();
 }
 
-ReaderMenuDialog::~ReaderMenuDialog() = default; // ← Исправлено имя
+ReaderMenuDialog::~ReaderMenuDialog() = default;
 
 void ReaderMenuDialog::setupUI() {
     setWindowTitle("Меню работы с читателями");
@@ -70,7 +70,7 @@ void ReaderMenuDialog::outputReader() {
         row << new QStandardItem(QString::fromStdString(u.getUserId()))
             << new QStandardItem(QString::fromStdString(u.getFullName()))
             << new QStandardItem(QString::fromStdString(u.getPhoneNumber()));
-        m_userModel->appendRow(row); // ← Исправлен вызов для Qt 5.15
+        m_userModel->appendRow(row);
     }
 }
 
@@ -94,7 +94,6 @@ void ReaderMenuDialog::onRegisterReader() {
 
     QString phone = QInputDialog::getText(this, "Регистрация", "Номер телефона:", QLineEdit::Normal, "+7", &ok);
 
-    // Автоматическая генерация неизменяемого ID
     std::string autoId = m_catalog.generateUserId();
     m_catalog.addUser(User(autoId, fullName.trimmed().toStdString(), phone.trimmed().toStdString()));
 
@@ -104,13 +103,12 @@ void ReaderMenuDialog::onRegisterReader() {
 }
 
 void ReaderMenuDialog::onRemoveReaderBySurname() {
-    // Открываем отдельное модальное окно для ввода фамилии
     bool ok;
     QString surname = QInputDialog::getText(this, "Удаление читателя",
-                                            "Введите фамилию для поиска и удаления:", QLineEdit::Normal, "", &ok);
+                                            "Введите фамилию для удаления:", QLineEdit::Normal, "", &ok);
 
     if (!ok || surname.trimmed().isEmpty()) {
-        return; // Пользователь нажал "Отмена" или ввёл пустую строку
+        return;
     }
 
     QString searchQuery = surname.trimmed().toLower();
@@ -126,7 +124,7 @@ void ReaderMenuDialog::onRemoveReaderBySurname() {
         m_historyModel->removeRows(0, m_historyModel->rowCount());
         QMessageBox::information(this, "Успех", "Читатель успешно удалён из системы.");
     } else {
-        QMessageBox::information(this, "Информация", "Читатель с такой фамилией не найден.");
+        QMessageBox::information(this, "Информация", "Читателя с такой фамилией в базе нет.");
     }
 }
 

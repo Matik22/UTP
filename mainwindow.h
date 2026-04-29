@@ -2,38 +2,46 @@
 #include <QMainWindow>
 #include <QStandardItemModel>
 #include <QSortFilterProxyModel>
-#include <QTableView>      // <-- Добавлено
-#include <QPushButton>     // <-- Добавлено
+#include <QTableView>
+#include <QPushButton>
+#include <QLineEdit>
+#include <QComboBox>
 #include "catalog.h"
-// В начало файла
+
 class ReaderMenuDialog;
 class QPushButton;
 
 class MainWindow : public QMainWindow {
-    Q_OBJECT
+ Q_OBJECT
 public:
-    explicit MainWindow(QWidget* parent = nullptr);
-    ~MainWindow() override;
+ explicit MainWindow(QWidget* parent = nullptr);
+ ~MainWindow() override;
 
 private slots:
-    void onAddBook();
-    void onSaveData();
-    void onRemoveBookById();
+ void onAddBook();
+ void onSaveData();
+ void onRemoveBookById();
+ void onIssueBook();
+ void onSearchChanged();
 
 private:
-    void setupUI();
-    void refreshTable();
+ void setupUI();
+ void refreshTable();
 
-    Catalog m_catalog;
-    QStandardItemModel* m_sourceModel;
-    QSortFilterProxyModel* m_proxyModel;
+ Catalog m_catalog;
+ QStandardItemModel* m_sourceModel;
+ QSortFilterProxyModel* m_proxyModel;
 
-    QTableView* m_tableView;
-    QPushButton* m_btnAdd;
-    QPushButton* m_btnSave;
-    // В private секцию
-    void openReaderMenu(); // ← Новый слот
-    QPushButton* m_btnReaders; // ← Новая кнопка
-    QPushButton* m_btnDeleteBook;
+ QTableView* m_tableView;
+ QPushButton* m_btnAdd;
+ QPushButton* m_btnSave;
 
+ void openReaderMenu();
+ QPushButton* m_btnReaders;
+ QPushButton* m_btnDeleteBook;
+
+ QPushButton* m_btnIssueBook;
+
+ QLineEdit* m_searchEdit;
+ QComboBox* m_searchColumn;
 };

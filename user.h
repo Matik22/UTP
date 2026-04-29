@@ -6,9 +6,7 @@ public:
     User();
     User(std::string userId, std::string fullName, std::string phoneNumber);
 
-    std::string getUserId() const; // Только чтение
-    // setUserId() удалён
-    // ... остальные геттеры/сеттеры
+    std::string getUserId() const;
     std::string getFullName() const;
     std::string getPhoneNumber() const;
 

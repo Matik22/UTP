@@ -12,7 +12,8 @@ SOURCES += \
     user.cpp \
     issuerecord.cpp \
     mainwindow.cpp \
-    readerdialog.cpp        # ← Добавлено
+    readerdialog.cpp \
+    issuedialog.cpp        # ← Добавлено
 
 HEADERS += \
     book.h \
@@ -20,7 +21,8 @@ HEADERS += \
     user.h \
     issuerecord.h \
     mainwindow.h \
-    readerdialog.h          # ← Добавлено
+    readerdialog.h \
+    issuedialog.h          # ← Добавлено
 
 win32:CONFIG -= console
 QMAKE_CXXFLAGS += -Wall -Wextra -pedantic

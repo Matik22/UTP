@@ -10,7 +10,7 @@ class ReaderMenuDialog : public QDialog {
     Q_OBJECT
 public:
     explicit ReaderMenuDialog(Catalog& catalog, QWidget* parent = nullptr);
-    ~ReaderMenuDialog() override; // ← Исправлено: было ~ReaderDialog()
+    ~ReaderMenuDialog() override;
 
 private slots:
     void onRegisterReader();
