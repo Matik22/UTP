@@ -4,6 +4,9 @@
 #include <QCoreApplication>
 #include <QDebug>
 #include <QDate>
+#include <QMap>
+#include <QDir>
+#include <QFileInfo>
 #include <sstream>
 #include <iomanip>
 #include <algorithm>
@@ -11,7 +14,17 @@
 Catalog::Catalog() = default;
 
 QString Catalog::getDataFilePath() const {
-    return QCoreApplication::applicationDirPath() + "/" + LibraryConstants::kDataFileName;
+    // 1. Рядом с исполняемым файлом
+    QString exeDir = QCoreApplication::applicationDirPath();
+    QString path = exeDir + "/" + LibraryConstants::kDataFileName;
+    if (QFileInfo::exists(path)) return path;
+
+    // 2. Текущая рабочая директория (актуально при запуске из Qt Creator на Linux)
+    QString cwdPath = QDir::currentPath() + "/" + LibraryConstants::kDataFileName;
+    if (QFileInfo::exists(cwdPath)) return cwdPath;
+
+    // 3. Файл не найден — вернём путь рядом с exe (туда и сохраним при первом Save)
+    return path;
 }
 
 bool Catalog::removeUser(const std::string& userId) {
@@ -56,9 +69,35 @@ std::string Catalog::generateUserId() const {
 }
 
 std::string Catalog::generateBookId(const std::string& genre) const {
-    char prefix = std::toupper(genre.empty() ? 'X' : genre[0]);
-    int maxNum = 0;
+    // Используем первую латинскую букву транслитерации жанра как префикс.
+    // genre может быть UTF-8 строкой с кириллицей — genre[0] даст неверный байт,
+    // поэтому берём первый Unicode-символ через QString и транслитерируем его в ASCII.
+    QString qGenre = QString::fromStdString(genre);
+    QChar firstChar = qGenre.isEmpty() ? QChar('X') : qGenre[0].toUpper();
 
+    // Маппинг первой буквы кириллицы → латинский префикс
+    static const QMap<QChar, char> cyrMap = {
+                                             {QChar(0x0410),'A'}, {QChar(0x0411),'B'}, {QChar(0x0412),'V'},
+                                             {QChar(0x0413),'G'}, {QChar(0x0414),'D'}, {QChar(0x0415),'E'},
+                                             {QChar(0x0416),'Z'}, {QChar(0x0417),'Z'}, {QChar(0x0418),'I'},
+                                             {QChar(0x0419),'Y'}, {QChar(0x041A),'K'}, {QChar(0x041B),'L'},
+                                             {QChar(0x041C),'M'}, {QChar(0x041D),'N'}, {QChar(0x041E),'O'},
+                                             {QChar(0x041F),'P'}, {QChar(0x0420),'R'}, {QChar(0x0421),'S'},
+                                             {QChar(0x0422),'T'}, {QChar(0x0423),'U'}, {QChar(0x0424),'F'},
+                                             {QChar(0x0425),'H'}, {QChar(0x0426),'C'}, {QChar(0x0427),'C'},
+                                             {QChar(0x0428),'S'}, {QChar(0x0429),'S'}, {QChar(0x042A),'X'},
+                                             {QChar(0x042B),'Y'}, {QChar(0x042C),'X'}, {QChar(0x042D),'E'},
+                                             {QChar(0x042E),'Y'}, {QChar(0x042F),'Y'},
+                                             };
+
+    char prefix;
+    if (firstChar.isLetter() && firstChar.unicode() < 128) {
+        prefix = static_cast<char>(firstChar.toUpper().toLatin1());
+    } else {
+        prefix = cyrMap.value(firstChar, 'X');
+    }
+
+    int maxNum = 0;
     for (const auto& b : m_books) {
         const auto& id = b.getBookId();
         if (!id.empty() && id[0] == prefix) {

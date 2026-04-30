@@ -10,6 +10,7 @@
 #include <QHeaderView>
 #include <QMessageBox>
 #include <QInputDialog>
+#include <QRegularExpression>
 #include <algorithm>
 
 ReaderMenuDialog::ReaderMenuDialog(Catalog& catalog, QWidget* parent)
@@ -93,9 +94,30 @@ void ReaderMenuDialog::onRegisterReader() {
     if (!ok || fullName.trimmed().isEmpty()) return;
 
     QString phone = QInputDialog::getText(this, "Регистрация", "Номер телефона:", QLineEdit::Normal, "+7", &ok);
+    if (!ok) return;
+
+    QString trimmedPhone = phone.trimmed();
+
+    // Проверка на наличие недопустимых символов (букв и т.д.)
+    if (QRegularExpression("[^0-9\\s\\-\\(\\)\\+]").match(trimmedPhone).hasMatch()) {
+        QMessageBox::warning(this, "Ошибка", "Номер телефона может содержать только цифры, +, (), пробелы и тире");
+        return;
+    }
+
+    QString digitsOnly = trimmedPhone;
+    digitsOnly.remove(QRegularExpression("[^0-9]"));
+
+    if (digitsOnly.length() != 11 || (digitsOnly[0] != '7' && digitsOnly[0] != '8')) {
+        QMessageBox::warning(this, "Ошибка", "Введите корректный номер телефона (11 цифр, начинается с 7 или 8)");
+        return;
+    }
+
+    // Стандартизируем номер для сохранения (добавляем + если начинается с 7)
+    QString normalizedPhone = digitsOnly;
+    if (normalizedPhone[0] == '7') normalizedPhone.prepend("+");
 
     std::string autoId = m_catalog.generateUserId();
-    m_catalog.addUser(User(autoId, fullName.trimmed().toStdString(), phone.trimmed().toStdString()));
+    m_catalog.addUser(User(autoId, fullName.trimmed().toStdString(), normalizedPhone.toStdString()));
 
     outputReader();
     QMessageBox::information(this, "Успех", QString("Читатель зарегистрирован.")
