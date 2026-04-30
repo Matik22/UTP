@@ -43,6 +43,8 @@ public:
     std::vector<Book> getAvailableBooks() const;
     const std::vector<IssueRecord>& getIssueRecords() const;
 
+    bool generateReport(const std::string& filePath) const;
+
 private:
     std::vector<Book> m_books;
     std::vector<User> m_users;

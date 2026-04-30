@@ -3,6 +3,7 @@
 #include <iostream>
 #include <QCoreApplication>
 #include <QDebug>
+#include <QDate>
 #include <sstream>
 #include <iomanip>
 #include <algorithm>
@@ -204,3 +205,107 @@ bool Catalog::returnBook(const std::string& bookId, const std::string& returnDat
 }
 
 const std::vector<IssueRecord>& Catalog::getIssueRecords() const { return m_issueRecords; }
+bool Catalog::generateReport(const std::string& filePath) const {
+    std::ofstream file(filePath);
+    if (!file.is_open()) return false;
+
+    auto now = QDate::currentDate().toString("dd.MM.yyyy").toStdString();
+
+    file << "============================================================\n";
+    file << "       ОТЧЁТ ПО БИБЛИОТЕЧНОМУ ФОНДУ\n";
+    file << "       Дата формирования: " << now << "\n";
+    file << "============================================================\n\n";
+
+    // 1. Общая статистика
+    int totalBooks = static_cast<int>(m_books.size());
+    int issuedCount = 0;
+    for (const auto& r : m_issueRecords)
+        if (r.getReturnDate().empty()) ++issuedCount;
+    int availableCount = totalBooks - issuedCount;
+
+    file << "[ ОБЩАЯ СТАТИСТИКА ]\n";
+    file << "  Всего изданий в фонде : " << totalBooks << "\n";
+    file << "  Выдано сейчас         : " << issuedCount << "\n";
+    file << "  Доступно              : " << availableCount << "\n";
+    file << "  Зарегистрировано чит. : " << m_users.size() << "\n";
+    file << "  Всего операций выдачи : " << m_issueRecords.size() << "\n\n";
+
+    // 2. Каталог изданий
+    file << "------------------------------------------------------------\n";
+    file << "[ КАТАЛОГ ИЗДАНИЙ ]\n";
+    file << "------------------------------------------------------------\n";
+    file << std::left
+         << std::setw(8)  << "ID"
+         << std::setw(32) << "Название"
+         << std::setw(22) << "Автор"
+         << std::setw(8)  << "Год"
+         << std::setw(16) << "Жанр"
+         << "Статус\n";
+    file << std::string(96, '-') << "\n";
+    for (const auto& b : m_books) {
+        bool issued = isBookIssued(b.getBookId());
+        std::string title = b.getTitle().size() > 30 ? b.getTitle().substr(0, 29) + "…" : b.getTitle();
+        std::string author = b.getAuthor().size() > 20 ? b.getAuthor().substr(0, 19) + "…" : b.getAuthor();
+        file << std::left
+             << std::setw(8)  << b.getBookId()
+             << std::setw(32) << title
+             << std::setw(22) << author
+             << std::setw(8)  << b.getYear()
+             << std::setw(16) << b.getGenre()
+             << (issued ? "ВЫДАНА" : "ДОСТУПНА") << "\n";
+    }
+    file << "\n";
+
+    // 3. Текущие выдачи
+    file << "------------------------------------------------------------\n";
+    file << "[ ТЕКУЩИЕ ВЫДАЧИ ]\n";
+    file << "------------------------------------------------------------\n";
+    bool hasActive = false;
+    for (const auto& r : m_issueRecords) {
+        if (!r.getReturnDate().empty()) continue;
+        hasActive = true;
+        // найти книгу и пользователя
+        std::string bookTitle = r.getBookId();
+        for (const auto& b : m_books)
+            if (b.getBookId() == r.getBookId()) { bookTitle = b.getTitle(); break; }
+        std::string userName = r.getUserId();
+        for (const auto& u : m_users)
+            if (u.getUserId() == r.getUserId()) { userName = u.getFullName(); break; }
+
+        file << "  Книга    : " << bookTitle << " [" << r.getBookId() << "]\n";
+        file << "  Читатель : " << userName  << " [" << r.getUserId() << "]\n";
+        file << "  Выдана   : " << r.getIssueDate() << "\n";
+        file << "  Вернуть  : " << r.getReturnDate() << "\n";
+        file << "  " << std::string(40, '-') << "\n";
+    }
+    if (!hasActive) file << "  Нет активных выдач.\n";
+    file << "\n";
+
+    // 4. История возвратов
+    file << "------------------------------------------------------------\n";
+    file << "[ ИСТОРИЯ ВОЗВРАТОВ ]\n";
+    file << "------------------------------------------------------------\n";
+    bool hasHistory = false;
+    for (const auto& r : m_issueRecords) {
+        if (r.getReturnDate().empty()) continue;
+        hasHistory = true;
+        std::string bookTitle = r.getBookId();
+        for (const auto& b : m_books)
+            if (b.getBookId() == r.getBookId()) { bookTitle = b.getTitle(); break; }
+        std::string userName = r.getUserId();
+        for (const auto& u : m_users)
+            if (u.getUserId() == r.getUserId()) { userName = u.getFullName(); break; }
+
+        file << "  " << bookTitle << " | " << userName
+             << " | Выд: " << r.getIssueDate()
+             << " | Возвр: " << r.getReturnDate() << "\n";
+    }
+    if (!hasHistory) file << "  История возвратов пуста.\n";
+    file << "\n";
+
+    file << "============================================================\n";
+    file << "  Конец отчёта\n";
+    file << "============================================================\n";
+
+    return true;
+}

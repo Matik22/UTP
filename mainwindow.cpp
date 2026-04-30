@@ -15,6 +15,7 @@
 #include <QLabel>
 #include <QComboBox>
 #include <QFileDialog>
+#include <QCoreApplication>
 #include <QFile>
 #include <QTextStream>
 #include "issuedialog.h"
@@ -104,6 +105,10 @@ void MainWindow::setupBooksPage() {
  topLayout->addStretch();
  m_btnSave = new QPushButton("Сохранить");
  topLayout->addWidget(m_btnSave);
+
+ m_btnReport = new QPushButton("Выгрузить отчёт");
+ topLayout->addWidget(m_btnReport);
+ QObject::connect(m_btnReport, &QPushButton::clicked, this, &MainWindow::onGenerateReport);
  mainLayout->addLayout(topLayout);
 
  // Строка поиска
@@ -265,7 +270,6 @@ void MainWindow::onImportBooks() {
  int added = 0;
  int skipped = 0;
  QTextStream in(&file);
- in.setCodec("UTF-8");
 
  while (!in.atEnd()) {
   QString line = in.readLine().trimmed();
@@ -525,4 +529,24 @@ void MainWindow::onReaderSelectionChanged(const QModelIndex& current, const QMod
  }
  QString userId = m_userModel->item(current.row(), 0)->text();
  showReaderHistory(userId.toStdString());
+}
+
+void MainWindow::onGenerateReport() {
+    QString filePath = QFileDialog::getSaveFileName(
+        this,
+        "Сохранить отчёт",
+        QCoreApplication::applicationDirPath() + "/report.txt",
+        "Текстовые файлы (*.txt)"
+    );
+    if (filePath.isEmpty()) return;
+
+    bool ok = m_catalog.generateReport(filePath.toStdString());
+    if (ok) {
+        QMessageBox::information(this, "Отчёт сохранён",
+            "Отчёт успешно выгружен в файл:\n" + filePath);
+        statusBar()->showMessage("Отчёт сохранён: " + filePath);
+    } else {
+        QMessageBox::warning(this, "Ошибка",
+            "Не удалось сохранить отчёт.\nПроверьте путь к файлу.");
+    }
 }

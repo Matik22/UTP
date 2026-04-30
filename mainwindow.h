@@ -32,6 +32,7 @@ private slots:
  void onChartTypeChanged();
  void onChartDataChanged();
  void onImportBooks();
+ void onGenerateReport();
 
 private:
  void setupUI();
@@ -58,6 +59,7 @@ private:
  QPushButton* m_btnIssueBook;
  QPushButton* m_btnChart;
  QPushButton* m_btnImport;
+ QPushButton* m_btnReport;
  QLineEdit* m_searchEdit;
  QComboBox* m_searchColumn;
 
