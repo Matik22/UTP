@@ -524,81 +524,93 @@ void MainWindow::showReaderHistory(const std::string& userId) {
 }
 
 void MainWindow::onRegisterReader() {
- bool ok;
- QString fullName = QInputDialog::getText(this, "Регистрация", "ФИО читателя:", QLineEdit::Normal, "", &ok);
- if (!ok || fullName.trimmed().isEmpty()) return;
+    QDialog dialog(this);
+    dialog.setWindowTitle("Регистрация читателя");
+    dialog.setModal(true);
+    dialog.setMinimumWidth(350);
 
- QString trimmed = fullName.trimmed().simplified();
+    QFormLayout* form = new QFormLayout(&dialog);
 
- // 1. Проверка на недопустимые символы
- QRegularExpression badChars("[^А-Яа-яЁё\\-\\s]");
- if (badChars.match(trimmed).hasMatch()) {
-     QMessageBox::warning(this, "Ошибка",
-                          "ФИО может содержать только русские буквы, пробелы и дефисы");
-     return;
- }
+    // Поля ввода
+    QLineEdit* fullNameEdit = new QLineEdit(&dialog);
+    QLineEdit* phoneEdit    = new QLineEdit(&dialog);
 
- // 2. Разбиваем на части
- QStringList parts = trimmed.split(" ");
- if (parts.size() < 2 || parts.size() > 3) {
-     QMessageBox::warning(this, "Ошибка",
-                          "ФИО должно состоять из 2 или 3 слов (Фамилия Имя [Отчество])");
-     return;
- }
+    fullNameEdit->setPlaceholderText("Фамилия Имя Отчество");
+    phoneEdit->setPlaceholderText("+7XXXXXXXXXX");
 
- // 3. Проверка длины каждой части
- for (const QString& p : parts) {
-     if (p.length() < 2) {
-         QMessageBox::warning(this, "Ошибка",
-                              "Каждая часть ФИО должна содержать минимум 2 буквы");
-         return;
-     }
- }
+    form->addRow("ФИО:", fullNameEdit);
+    form->addRow("Телефон:", phoneEdit);
 
- // 4. Проверка заглавной буквы
- for (const QString& p : parts) {
-     if (!p[0].isUpper()) {
-         QMessageBox::warning(this, "Ошибка",
-                              "Каждая часть ФИО должна начинаться с заглавной буквы");
-         return;
-     }
- }
+    // Кнопки OK / Cancel
+    QDialogButtonBox* btnBox =
+        new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &dialog);
+    form->addRow(btnBox);
 
- // 5. Нормализованное ФИО
- QString normalizedFullName = trimmed;
+    connect(btnBox, &QDialogButtonBox::accepted, &dialog, &QDialog::accept);
+    connect(btnBox, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
 
+    // Если нажали OK
+    if (dialog.exec() == QDialog::Accepted) {
 
- QString phone = QInputDialog::getText(this, "Регистрация", "Номер телефона:", QLineEdit::Normal, "+7", &ok);
- if (!ok) return;
+        QString fullName = fullNameEdit->text().trimmed().simplified();
+        QString phone    = phoneEdit->text().trimmed();
 
- QString trimmedPhone = phone.trimmed();
+        // === Валидация ФИО ===
+        QRegularExpression badChars("[^А-Яа-яЁё\\-\\s]");
+        if (badChars.match(fullName).hasMatch()) {
+            QMessageBox::warning(this, "Ошибка",
+                                 "ФИО может содержать только русские буквы, пробелы и дефисы");
+            return;
+        }
 
- // Проверка на недопустимые символы
- if (QRegularExpression("[^0-9\\s\\-\\(\\)\\+]").match(trimmedPhone).hasMatch()) {
-     QMessageBox::warning(this, "Ошибка", "Телефон может содержать только цифры, +, (), пробелы и тире");
-     return;
- }
+        QStringList parts = fullName.split(" ");
+        if (parts.size() < 2 || parts.size() > 3) {
+            QMessageBox::warning(this, "Ошибка",
+                                 "ФИО должно состоять из 2–3 слов");
+            return;
+        }
 
- QString digitsOnly = trimmedPhone;
- digitsOnly.remove(QRegularExpression("[^0-9]"));
+        for (const QString& p : parts) {
+            if (p.length() < 2 || !p[0].isUpper()) {
+                QMessageBox::warning(this, "Ошибка",
+                                     "Каждая часть ФИО должна начинаться с заглавной буквы");
+                return;
+            }
+        }
 
- if (digitsOnly.length() != 11 || (digitsOnly[0] != '7' && digitsOnly[0] != '8')) {
-     QMessageBox::warning(this, "Ошибка", "Введите корректный номер телефона (11 цифр, начинается с 7 или 8)");
-     return;
- }
+        // === Валидация телефона ===
+        if (QRegularExpression("[^0-9\\s\\-\\(\\)\\+]").match(phone).hasMatch()) {
+            QMessageBox::warning(this, "Ошибка",
+                                 "Телефон может содержать только цифры, +, (), пробелы и тире");
+            return;
+        }
 
- QString normalizedPhone = digitsOnly;
- if (normalizedPhone[0] == '7')
-     normalizedPhone.prepend("+");
+        QString digitsOnly = phone;
+        digitsOnly.remove(QRegularExpression("[^0-9]"));
 
- std::string autoId = m_catalog.generateUserId();
- m_catalog.addUser(User(autoId, fullName.trimmed().toStdString(), phone.trimmed().toStdString()));
- m_catalog.autoSave();
+        if (digitsOnly.length() != 11 || (digitsOnly[0] != '7' && digitsOnly[0] != '8')) {
+            QMessageBox::warning(this, "Ошибка",
+                                 "Введите корректный номер телефона (11 цифр, начинается с 7 или 8)");
+            return;
+        }
 
+        QString normalizedPhone = digitsOnly;
+        if (normalizedPhone[0] == '7')
+            normalizedPhone.prepend("+");
 
- refreshReadersTable();
- QMessageBox::information(this, "Успех", "Читатель зарегистрирован.");
+        // === Добавление читателя ===
+        std::string autoId = m_catalog.generateUserId();
+        m_catalog.addUser(User(autoId,
+                               fullName.toStdString(),
+                               normalizedPhone.toStdString()));
+
+        m_catalog.autoSave();
+        refreshReadersTable();
+
+        QMessageBox::information(this, "Успех", "Читатель зарегистрирован.");
+    }
 }
+
 
 void MainWindow::onRemoveReaderBySurname() {
  bool ok;
