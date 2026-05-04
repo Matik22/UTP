@@ -517,6 +517,46 @@ void MainWindow::onRegisterReader() {
  QString fullName = QInputDialog::getText(this, "Регистрация", "ФИО читателя:", QLineEdit::Normal, "", &ok);
  if (!ok || fullName.trimmed().isEmpty()) return;
 
+ QString trimmed = fullName.trimmed().simplified();
+
+ // 1. Проверка на недопустимые символы
+ QRegularExpression badChars("[^А-Яа-яЁё\\-\\s]");
+ if (badChars.match(trimmed).hasMatch()) {
+     QMessageBox::warning(this, "Ошибка",
+                          "ФИО может содержать только русские буквы, пробелы и дефисы");
+     return;
+ }
+
+ // 2. Разбиваем на части
+ QStringList parts = trimmed.split(" ");
+ if (parts.size() < 2 || parts.size() > 3) {
+     QMessageBox::warning(this, "Ошибка",
+                          "ФИО должно состоять из 2 или 3 слов (Фамилия Имя [Отчество])");
+     return;
+ }
+
+ // 3. Проверка длины каждой части
+ for (const QString& p : parts) {
+     if (p.length() < 2) {
+         QMessageBox::warning(this, "Ошибка",
+                              "Каждая часть ФИО должна содержать минимум 2 буквы");
+         return;
+     }
+ }
+
+ // 4. Проверка заглавной буквы
+ for (const QString& p : parts) {
+     if (!p[0].isUpper()) {
+         QMessageBox::warning(this, "Ошибка",
+                              "Каждая часть ФИО должна начинаться с заглавной буквы");
+         return;
+     }
+ }
+
+ // 5. Нормализованное ФИО
+ QString normalizedFullName = trimmed;
+
+
  QString phone = QInputDialog::getText(this, "Регистрация", "Номер телефона:", QLineEdit::Normal, "+7", &ok);
  if (!ok) return;
 
@@ -653,6 +693,35 @@ void MainWindow::onImportReaders() {
 
         std::string autoId = m_catalog.generateUserId();
         m_catalog.addUser(User(autoId, fullName.toStdString(), normalizedPhone.toStdString()));
+
+        QString trimmedName = fullName.trimmed().simplified();
+
+        // Проверка символов
+        if (QRegularExpression("[^А-Яа-яЁё\\-\\s]").match(trimmedName).hasMatch()) {
+            skipped++;
+            continue;
+        }
+
+        QStringList nameParts = trimmedName.split(" ");
+        if (nameParts.size() < 2 || nameParts.size() > 3) {
+            skipped++;
+            continue;
+        }
+
+        bool bad = false;
+        for (const QString& p : std::as_const(nameParts)){
+            if (p.length() < 2 || !p[0].isUpper()) {
+                bad = true;
+                break;
+            }
+        }
+        if (bad) {
+            skipped++;
+            continue;
+        }
+
+        QString normalizedName = trimmedName;
+
         added++;
     }
 
