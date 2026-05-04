@@ -27,7 +27,17 @@ LoginDialog::LoginDialog(Catalog& catalog, QWidget* parent)
     layout->addWidget(m_passEdit);
     layout->addWidget(btn);
 
-    connect(btn, &QPushButton::clicked, this, &LoginDialog::onLogin);
+    connect(m_loginEdit, &QLineEdit::returnPressed, this, [this]() {
+        m_passEdit->setFocus();
+    });
+
+    connect(m_passEdit, &QLineEdit::returnPressed, this, [this]() {
+        if (m_passEdit->text().isEmpty()) {
+            m_loginEdit->setFocus();
+        } else {
+            onLogin();
+        }
+    });
 }
 
 void LoginDialog::onLogin() {
