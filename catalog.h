@@ -55,6 +55,9 @@ public:
     bool checkLibrarian(const std::string& login, const std::string& password) const;
     void addLibrarian(const Librarian& lib);
 
+    void autoSave();
+
+
 private:
     std::vector<Book> m_books;
     std::vector<User> m_users;

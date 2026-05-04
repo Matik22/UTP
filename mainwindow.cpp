@@ -409,6 +409,8 @@ void MainWindow::onAddBook() {
                publisher.toStdString(), year, genre.toStdString());
 
   m_catalog.addBook(newBook);
+  m_catalog.autoSave();
+
   refreshTable();
   QMessageBox::information(this, "Успех", QString("Издание добавлено. Присвоен ID: %1").arg(QString::fromStdString(autoId)));
  }
@@ -427,6 +429,8 @@ void MainWindow::onRemoveBookById() {
   QMessageBox::warning(this, "Ошибка",
    "Книга не найдена или находится в обороте у читателя. Удаление невозможно.");
  }
+ m_catalog.autoSave();
+
 }
 
 void MainWindow::onSaveData() {
@@ -438,6 +442,8 @@ void MainWindow::onIssueBook() {
  IssueDialog dialog(m_catalog, this);
  if (dialog.exec() == QDialog::Accepted) {
   refreshTable();
+     m_catalog.autoSave();
+
   QMessageBox::information(this, "Успех", "Книга успешно выдана читателю.");
  }
 }
@@ -587,6 +593,8 @@ void MainWindow::onRegisterReader() {
 
  std::string autoId = m_catalog.generateUserId();
  m_catalog.addUser(User(autoId, fullName.trimmed().toStdString(), phone.trimmed().toStdString()));
+ m_catalog.autoSave();
+
 
  refreshReadersTable();
  QMessageBox::information(this, "Успех", "Читатель зарегистрирован.");
@@ -607,6 +615,8 @@ void MainWindow::onRemoveReaderBySurname() {
 
  if (it != users.end()) {
   m_catalog.removeUser(it->getUserId());
+     m_catalog.autoSave();
+
   refreshReadersTable();
   QMessageBox::information(this, "Успех", "Читатель успешно удалён из системы.");
  } else {
@@ -763,6 +773,7 @@ void MainWindow::onRegisterLibrarian() {
     if (!ok || pass.isEmpty()) return;
 
     m_catalog.addLibrarian(Librarian(login.toStdString(), pass.toStdString()));
+    m_catalog.autoSave();
 
     QMessageBox::information(this, "Успех", "Библиотекарь зарегистрирован.");
 }

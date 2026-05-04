@@ -383,3 +383,8 @@ void Catalog::addLibrarian(const Librarian& lib) {
     m_librarians.push_back(lib);
     saveLibrarians();
 }
+
+void Catalog::autoSave() {
+    saveData();
+    saveLibrarians();
+}
