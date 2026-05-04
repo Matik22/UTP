@@ -518,6 +518,27 @@ void MainWindow::onRegisterReader() {
  if (!ok || fullName.trimmed().isEmpty()) return;
 
  QString phone = QInputDialog::getText(this, "Регистрация", "Номер телефона:", QLineEdit::Normal, "+7", &ok);
+ if (!ok) return;
+
+ QString trimmedPhone = phone.trimmed();
+
+ // Проверка на недопустимые символы
+ if (QRegularExpression("[^0-9\\s\\-\\(\\)\\+]").match(trimmedPhone).hasMatch()) {
+     QMessageBox::warning(this, "Ошибка", "Телефон может содержать только цифры, +, (), пробелы и тире");
+     return;
+ }
+
+ QString digitsOnly = trimmedPhone;
+ digitsOnly.remove(QRegularExpression("[^0-9]"));
+
+ if (digitsOnly.length() != 11 || (digitsOnly[0] != '7' && digitsOnly[0] != '8')) {
+     QMessageBox::warning(this, "Ошибка", "Введите корректный номер телефона (11 цифр, начинается с 7 или 8)");
+     return;
+ }
+
+ QString normalizedPhone = digitsOnly;
+ if (normalizedPhone[0] == '7')
+     normalizedPhone.prepend("+");
 
  std::string autoId = m_catalog.generateUserId();
  m_catalog.addUser(User(autoId, fullName.trimmed().toStdString(), phone.trimmed().toStdString()));
