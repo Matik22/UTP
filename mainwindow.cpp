@@ -153,6 +153,28 @@ void MainWindow::setupReadersPage() {
  QVBoxLayout* mainLayout = new QVBoxLayout(m_readersPage);
 
  QHBoxLayout* topLayout = new QHBoxLayout();
+
+ // === Поиск читателей ===
+ QHBoxLayout* searchLayout = new QHBoxLayout();
+
+ QLabel* lblSearch = new QLabel("Искать по:");
+ m_readerSearchColumn = new QComboBox();
+ m_readerSearchColumn->addItems({"ФИО", "Телефон", "ID"});
+
+ m_readerSearchEdit = new QLineEdit();
+ m_readerSearchEdit->setPlaceholderText("Введите текст для поиска...");
+
+ searchLayout->addWidget(lblSearch);
+ searchLayout->addWidget(m_readerSearchColumn);
+ searchLayout->addWidget(m_readerSearchEdit);
+
+ mainLayout->addLayout(searchLayout);
+
+ connect(m_readerSearchEdit, &QLineEdit::textChanged,
+         this, &MainWindow::onReaderSearchChanged);
+ connect(m_readerSearchColumn, QOverload<int>::of(&QComboBox::currentIndexChanged),
+         this, &MainWindow::onReaderSearchChanged);
+
  m_btnBack = new QPushButton("Назад");
  topLayout->addWidget(m_btnBack);
  QObject::connect(m_btnBack, &QPushButton::clicked, this, &MainWindow::onSwitchToCatalog);
@@ -599,4 +621,17 @@ void MainWindow::onImportReaders() {
         "Импорт завершён",
         QString("Добавлено: %1\nПропущено: %2").arg(added).arg(skipped)
         );
+}
+
+void MainWindow::onReaderSearchChanged() {
+    QString text = m_readerSearchEdit->text();
+    int column = m_readerSearchColumn->currentIndex();
+
+    int realColumn = 0;
+    if (column == 0) realColumn = 1;   // ФИО
+    if (column == 1) realColumn = 2;   // Телефон
+    if (column == 2) realColumn = 0;   // ID
+
+    m_userProxy->setFilterKeyColumn(realColumn);
+    m_userProxy->setFilterFixedString(text);
 }

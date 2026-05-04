@@ -34,6 +34,7 @@ private slots:
  void onImportBooks();
  void onGenerateReport();
  void onImportReaders();
+ void onReaderSearchChanged();
 
 private:
  void setupUI();
@@ -83,4 +84,6 @@ private:
  QPushButton* m_btnBackFromChart;
  QComboBox* m_chartTypeCombo;
  QComboBox* m_chartDataCombo;
+ QLineEdit* m_readerSearchEdit;
+ QComboBox* m_readerSearchColumn;
 };
