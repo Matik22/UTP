@@ -629,8 +629,30 @@ void MainWindow::onImportReaders() {
 
         if (fullName.isEmpty()) { skipped++; continue; }
 
+        QString trimmedPhone = phone.trimmed();
+
+        // Проверка на недопустимые символы
+        if (QRegularExpression("[^0-9\\s\\-\\(\\)\\+]").match(trimmedPhone).hasMatch()) {
+            skipped++;
+            continue;
+        }
+
+        QString digitsOnly = trimmedPhone;
+        digitsOnly.remove(QRegularExpression("[^0-9]"));
+
+        if (!digitsOnly.isEmpty()) {
+            if (digitsOnly.length() != 11 || (digitsOnly[0] != '7' && digitsOnly[0] != '8')) {
+                skipped++;
+                continue;
+            }
+        }
+
+        QString normalizedPhone = digitsOnly;
+        if (!digitsOnly.isEmpty() && normalizedPhone[0] == '7')
+            normalizedPhone.prepend("+");
+
         std::string autoId = m_catalog.generateUserId();
-        m_catalog.addUser(User(autoId, fullName.toStdString(), phone.toStdString()));
+        m_catalog.addUser(User(autoId, fullName.toStdString(), normalizedPhone.toStdString()));
         added++;
     }
 
