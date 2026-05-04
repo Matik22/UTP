@@ -33,6 +33,7 @@ private slots:
  void onChartDataChanged();
  void onImportBooks();
  void onGenerateReport();
+ void onImportReaders();
 
 private:
  void setupUI();
@@ -73,6 +74,8 @@ private:
  QPushButton* m_btnBack;
  QPushButton* m_btnRegister;
  QPushButton* m_btnDeleteReader;
+ QPushButton* m_btnImportReaders;
+
 
  // Страница статистики
  QWidget* m_chartPage;

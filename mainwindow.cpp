@@ -196,6 +196,10 @@ void MainWindow::setupReadersPage() {
                   this, &MainWindow::onReaderSelectionChanged);
 
  m_stack->addWidget(m_readersPage);
+
+ m_btnImportReaders = new QPushButton("Загрузить читателей");
+ topLayout->addWidget(m_btnImportReaders);
+ connect(m_btnImportReaders, &QPushButton::clicked, this, &MainWindow::onImportReaders);
 }
 
 void MainWindow::setupChartPage() {
@@ -549,4 +553,50 @@ void MainWindow::onGenerateReport() {
         QMessageBox::warning(this, "Ошибка",
             "Не удалось сохранить отчёт.\nПроверьте путь к файлу.");
     }
+}
+
+void MainWindow::onImportReaders() {
+    QString filename = QFileDialog::getOpenFileName(
+        this,
+        "Загрузить список читателей",
+        "",
+        "Текстовые файлы (*.txt);;Все файлы (*)"
+        );
+    if (filename.isEmpty()) return;
+
+    QFile file(filename);
+    if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+        QMessageBox::warning(this, "Ошибка", "Не удалось открыть файл.");
+        return;
+    }
+
+    int added = 0;
+    int skipped = 0;
+    QTextStream in(&file);
+
+    while (!in.atEnd()) {
+        QString line = in.readLine().trimmed();
+        if (line.isEmpty() || line.startsWith('#')) continue;
+
+        QStringList parts = line.split("|");
+        if (parts.size() < 1) { skipped++; continue; }
+
+        QString fullName = parts[0].trimmed();
+        QString phone = parts.size() > 1 ? parts[1].trimmed() : "";
+
+        if (fullName.isEmpty()) { skipped++; continue; }
+
+        std::string autoId = m_catalog.generateUserId();
+        m_catalog.addUser(User(autoId, fullName.toStdString(), phone.toStdString()));
+        added++;
+    }
+
+    file.close();
+    refreshReadersTable();
+
+    QMessageBox::information(
+        this,
+        "Импорт завершён",
+        QString("Добавлено: %1\nПропущено: %2").arg(added).arg(skipped)
+        );
 }
