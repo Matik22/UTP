@@ -235,7 +235,7 @@ void MainWindow::setupChartPage() {
 
  topLayout->addWidget(new QLabel("Тип диаграммы:"));
  m_chartTypeCombo = new QComboBox();
- m_chartTypeCombo->addItems({"Круговая", "Столбчатая", "Линейчатая"});
+ m_chartTypeCombo->addItems({"Круговая", "Столбчатая", "Точечная"});
  topLayout->addWidget(m_chartTypeCombo);
 
  topLayout->addWidget(new QLabel("Данные:"));
