@@ -255,6 +255,11 @@ void MainWindow::setupChartPage() {
                   this, &MainWindow::onChartDataChanged);
 
  m_stack->addWidget(m_chartPage);
+
+ m_btnRegisterLibrarian = new QPushButton("Регистрация библиотекаря");
+ topLayout->addWidget(m_btnRegisterLibrarian);
+ connect(m_btnRegisterLibrarian, &QPushButton::clicked, this, &MainWindow::onRegisterLibrarian);
+
 }
 
 // === Навигация ===
@@ -746,4 +751,18 @@ void MainWindow::onReaderSearchChanged() {
 
     m_userProxy->setFilterKeyColumn(realColumn);
     m_userProxy->setFilterFixedString(text);
+}
+
+// Регистрация
+void MainWindow::onRegisterLibrarian() {
+    bool ok;
+    QString login = QInputDialog::getText(this, "Регистрация", "Логин:", QLineEdit::Normal, "", &ok);
+    if (!ok || login.isEmpty()) return;
+
+    QString pass = QInputDialog::getText(this, "Регистрация", "Пароль:", QLineEdit::Normal, "", &ok);
+    if (!ok || pass.isEmpty()) return;
+
+    m_catalog.addLibrarian(Librarian(login.toStdString(), pass.toStdString()));
+
+    QMessageBox::information(this, "Успех", "Библиотекарь зарегистрирован.");
 }

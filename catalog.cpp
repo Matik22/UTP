@@ -348,3 +348,38 @@ bool Catalog::generateReport(const std::string& filePath) const {
 
     return true;
 }
+
+void Catalog::loadLibrarians() {
+    std::string basePath =
+        QCoreApplication::applicationDirPath().toStdString() + "/../../../";
+
+    std::string fullPath = basePath + "librarians.txt";
+
+    std::ifstream file(fullPath);
+
+    if (!file.is_open()) return;
+
+    std::string line;
+    while (std::getline(file, line)) {
+        if (!line.empty())
+            m_librarians.push_back(Librarian::fromFileString(line));
+    }
+}
+
+void Catalog::saveLibrarians() const {
+    std::ofstream file("librarians.txt", std::ios::trunc);
+    for (const auto& l : m_librarians)
+        file << l.toFileString() << "\n";
+}
+
+bool Catalog::checkLibrarian(const std::string& login, const std::string& password) const {
+    for (const auto& l : m_librarians)
+        if (l.login() == login && l.password() == password)
+            return true;
+    return false;
+}
+
+void Catalog::addLibrarian(const Librarian& lib) {
+    m_librarians.push_back(lib);
+    saveLibrarians();
+}

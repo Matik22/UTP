@@ -4,6 +4,7 @@
 #include "book.h"
 #include "user.h"
 #include "issuerecord.h"
+#include "librarian.h"
 #include <QString>
 
 
@@ -44,6 +45,15 @@ public:
     const std::vector<IssueRecord>& getIssueRecords() const;
 
     bool generateReport(const std::string& filePath) const;
+
+    // Библиотекари
+    std::vector<Librarian> m_librarians;
+
+    void loadLibrarians();
+    void saveLibrarians() const;
+
+    bool checkLibrarian(const std::string& login, const std::string& password) const;
+    void addLibrarian(const Librarian& lib);
 
 private:
     std::vector<Book> m_books;

@@ -6,23 +6,27 @@ TARGET = LibraryFund
 TEMPLATE = app
 
 SOURCES += \
-main.cpp \
-book.cpp \
-catalog.cpp \
-user.cpp \
-issuerecord.cpp \
-mainwindow.cpp \
-issuedialog.cpp \
-chartwidget.cpp
+    main.cpp \
+    book.cpp \
+    catalog.cpp \
+    user.cpp \
+    issuerecord.cpp \
+    mainwindow.cpp \
+    issuedialog.cpp \
+    chartwidget.cpp \
+    logindialog.cpp
+
 
 HEADERS += \
-book.h \
-catalog.h \
-user.h \
-issuerecord.h \
-mainwindow.h \
-issuedialog.h \
-chartwidget.h
+    book.h \
+    catalog.h \
+    user.h \
+    issuerecord.h \
+    mainwindow.h \
+    issuedialog.h \
+    chartwidget.h \
+    librarian.h \
+    logindialog.h \
 
 win32:CONFIG -= console
 QMAKE_CXXFLAGS += -Wall -Wextra -pedantic

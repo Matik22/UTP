@@ -35,6 +35,7 @@ private slots:
  void onGenerateReport();
  void onImportReaders();
  void onReaderSearchChanged();
+ void onRegisterLibrarian();
 
 private:
  void setupUI();
@@ -86,4 +87,7 @@ private:
  QComboBox* m_chartDataCombo;
  QLineEdit* m_readerSearchEdit;
  QComboBox* m_readerSearchColumn;
+
+ // Решистр
+ QPushButton* m_btnRegisterLibrarian;
 };
