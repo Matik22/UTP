@@ -362,6 +362,7 @@ void MainWindow::refreshTable() {
       << new QStandardItem(QString::fromStdString(b.getPublisher()))
       << new QStandardItem(QString::number(b.getYear()))
       << new QStandardItem(QString::fromStdString(b.getGenre()));
+  row[0]->setFlags(row[0]->flags() & ~Qt::ItemIsEditable);
   m_sourceModel->appendRow(row);
  }
 }
@@ -380,12 +381,27 @@ void MainWindow::onAddBook() {
  QSpinBox* yearEdit = new QSpinBox(&dialog);
  yearEdit->setRange(1000, QDate::currentDate().year());
  yearEdit->setValue(QDate::currentDate().year());
- QLineEdit* genreEdit = new QLineEdit(&dialog);
  formLayout->addRow(QStringLiteral("Название:"), titleEdit);
  formLayout->addRow(QStringLiteral("Автор:"), authorEdit);
  formLayout->addRow(QStringLiteral("Издательство:"), publisherEdit);
  formLayout->addRow(QStringLiteral("Год издания:"), yearEdit);
- formLayout->addRow(QStringLiteral("Жанр:"), genreEdit);
+ QComboBox* genreCombo = new QComboBox(&dialog);
+ genreCombo->addItems({
+     "Учебник",
+     "Фантастика",
+     "Фэнтези",
+     "Детектив",
+     "Роман",
+     "Приключения",
+     "Научная литература",
+     "История",
+     "Поэзия",
+     "Детская литература",
+     "Документальная",
+     "Другое"
+ });
+
+ formLayout->addRow(QStringLiteral("Жанр:"), genreCombo);
 
  QDialogButtonBox* btnBox = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &dialog);
  formLayout->addRow(btnBox);
@@ -397,7 +413,7 @@ void MainWindow::onAddBook() {
   QString author = authorEdit->text().trimmed();
   QString publisher = publisherEdit->text().trimmed();
   int year = yearEdit->value();
-  QString genre = genreEdit->text().trimmed();
+  QString genre = genreCombo->currentText();
 
   if (title.isEmpty() || author.isEmpty()) {
    QMessageBox::warning(this, "Ошибка", "Название и Автор обязательны.");
@@ -506,6 +522,8 @@ void MainWindow::refreshReadersTable() {
   row << new QStandardItem(QString::fromStdString(u.getUserId()))
       << new QStandardItem(QString::fromStdString(u.getFullName()))
       << new QStandardItem(QString::fromStdString(u.getPhoneNumber()));
+  row[0]->setFlags(row[0]->flags() & ~Qt::ItemIsEditable);
+
   m_userModel->appendRow(row);
  }
 }
