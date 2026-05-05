@@ -36,6 +36,7 @@ private slots:
  void onImportReaders();
  void onReaderSearchChanged();
  void onRegisterLibrarian();
+ void onReturnBook();
 
 private:
  void setupUI();
@@ -60,6 +61,7 @@ private:
  QPushButton* m_btnReaders;
  QPushButton* m_btnDeleteBook;
  QPushButton* m_btnIssueBook;
+ QPushButton* m_btnReturnBook;
  QPushButton* m_btnChart;
  QPushButton* m_btnImport;
  QPushButton* m_btnReport;

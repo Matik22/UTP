@@ -5,12 +5,19 @@
 #include "user.h"
 #include "issuerecord.h"
 #include "librarian.h"
-#include <QString>
+#include <QtCore/qstring.h>
+#include <QtCore/qcoreapplication.h>
+#include <QtCore/qdebug.h>
+#include <QtCore/qmap.h>
+#include <QtCore/qdir.h>
+#include <QtCore/qfileinfo.h>
 
 
 namespace LibraryConstants {
-constexpr const char* kDataFileName = "library_data.txt";
-constexpr const char* uDataFileName = "user_data.txt";
+constexpr const char* kDataFileName = "library_data.txt"; // только книги
+constexpr const char* kLibrariansFileName = "librarians.txt"; // файл библиотекарей
+constexpr const char* kReadersFileName = "readers.txt"; // отдельный файл читателей
+constexpr const char* kIssuesFileName = "issues.txt"; // отдельный файл выдач
 constexpr int kMaxBooks = 1000;
 constexpr int kMaxUsers = 500;
 constexpr int kMaxBorrowDays = 60;
@@ -52,10 +59,23 @@ public:
     void loadLibrarians();
     void saveLibrarians() const;
 
+    // Readers (users) handling in separate file
+    void loadReaders();
+    void saveReaders() const;
+
+    // Issue records handling in separate file
+    void loadIssueRecords();
+    void saveIssues() const;
+
+    // Автоматически выдать доступные книги всем читателям
+    void autoIssueAllBooksToReaders();
+
     bool checkLibrarian(const std::string& login, const std::string& password) const;
     void addLibrarian(const Librarian& lib);
 
     void autoSave();
+    void debugPrintLibrarians() const;
+    QString getLibrariansFilePath() const;
 
 
 private:

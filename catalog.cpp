@@ -6,12 +6,16 @@
 #include <QDate>
 #include <QMap>
 #include <QDir>
-#include <QFileInfo>
 #include <sstream>
 #include <iomanip>
 #include <algorithm>
+#include <QtCore/qfileinfo.h>
+#include <QFile>
+#include <QTextStream>
 
-Catalog::Catalog() = default;
+Catalog::Catalog() {
+    loadLibrarians();  // Загружаем библиотекарей при создании
+}
 
 QString Catalog::getDataFilePath() const {
     // 1. Рядом с исполняемым файлом
@@ -24,6 +28,20 @@ QString Catalog::getDataFilePath() const {
     if (QFileInfo::exists(cwdPath)) return cwdPath;
 
     // 3. Файл не найден — вернём путь рядом с exe (туда и сохраним при первом Save)
+    return path;
+}
+
+QString Catalog::getLibrariansFilePath() const {
+    // 1. Рядом с исполняемым файлом
+    QString exeDir = QCoreApplication::applicationDirPath();
+    QString path = exeDir + "/" + LibraryConstants::kLibrariansFileName;
+    if (QFileInfo::exists(path)) return path;
+
+    // 2. Текущая рабочая директория
+    QString cwdPath = QDir::currentPath() + "/" + LibraryConstants::kLibrariansFileName;
+    if (QFileInfo::exists(cwdPath)) return cwdPath;
+
+    // 3. Файл не найден — вернём путь рядом с exe (туда и сохраним)
     return path;
 }
 
@@ -111,22 +129,67 @@ std::string Catalog::generateBookId(const std::string& genre) const {
     oss << prefix << std::setw(3) << std::setfill('0') << (maxNum + 1);
     return oss.str();
 }
+void Catalog::saveData() const {
+    QString filePath = getDataFilePath();
+    QFile file(filePath);
+    if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) {
+        qDebug() << "Ошибка открытия файла для сохранения:" << filePath;
+        return;
+    }
+
+    QTextStream out(&file);
+    out.setCodec("UTF-8");
+    out.setGenerateByteOrderMark(true);
+
+    // 1. Секция книг
+    out << "===BOOKS===\n";
+    for (const auto& b : m_books) {
+        out << QString::fromStdString(b.toFileString()) << "\n";
+    }
+
+    // 2. Секция читателей
+    out << "\n===USERS===\n";
+    for (const auto& u : m_users) {
+        out << QString::fromStdString(u.toFileString()) << "\n";
+    }
+
+    // 3. Секция выдач/возвратов
+    out << "\n===ISSUES===\n";
+    for (const auto& i : m_issueRecords) {
+        out << QString::fromStdString(i.toFileString()) << "\n";
+    }
+
+    file.close();
+    qDebug() << "[OK] Данные сохранены в:" << filePath;
+}
 
 void Catalog::loadData() {
     QString filePath = getDataFilePath();
-    std::ifstream file(filePath.toStdString());
+    QFile file(filePath);
 
-    if (!file.is_open()) {
-        qDebug() << "[WARN] Файл данных не найден:" << filePath;
-        qDebug() << "[INFO] Приложение запущено с пустым каталогом.";
+    if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+        qDebug() << "Файл данных не найден:" << filePath;
+        qDebug() << "Приложение запущено с пустым каталогом";
         return;
     }
+
+    QTextStream in(&file);
+    in.setCodec("UTF-8");
 
     std::string line, section;
     int loadedBooks = 0, loadedUsers = 0, loadedIssues = 0;
 
-    while (std::getline(file, line)) {
-        // Убираем \r от Windows-переносов строк
+    while (!in.atEnd()) {
+        QString qline = in.readLine();
+        std::string line = qline.toStdString();
+
+        // Убираем BOM если есть
+        if (!line.empty() && (unsigned char)line[0] == 0xEF &&
+            (unsigned char)line[1] == 0xBB && (unsigned char)line[2] == 0xBF) {
+            line = line.substr(3);
+        }
+
+        // Убираем \r
         if (!line.empty() && line.back() == '\r') line.pop_back();
 
         if (line.empty() || line[0] == '#') continue;
@@ -146,38 +209,11 @@ void Catalog::loadData() {
                 loadedIssues++;
             }
         } catch (const std::exception& e) {
-            qDebug() << "[WARN] Ошибка парсинга [" << QString::fromStdString(section)
-                << "]:" << QString::fromStdString(line) << "→" << e.what();
+            qDebug() << "Ошибка парсинга строки:" << line.c_str();
         }
     }
-    qDebug() << "[OK] Загрузка завершена. Книг:" << loadedBooks
-             << "| Читателей:" << loadedUsers << "| Выдач:" << loadedIssues;
-}
-
-void Catalog::saveData() const {
-    QString filePath = getDataFilePath();
-    std::ofstream file(filePath.toStdString(), std::ios::trunc);
-
-    if (!file.is_open()) {
-        qDebug() << "[ERROR] Не удалось открыть файл для сохранения:" << filePath;
-        return;
-    }
-
-    // 1. Секция книг
-    file << "===BOOKS===\n";
-    for (const auto& b : m_books) file << b.toFileString() << "\n";
-
-    // 2. Секция читателей
-    file << "\n===USERS===\n";
-    for (const auto& u : m_users) file << u.toFileString() << "\n";
-
-    // 3. Секция выдач/возвратов
-    file << "\n===ISSUES===\n";
-    for (const auto& i : m_issueRecords) file << i.toFileString() << "\n";
-
-    qDebug() << "[OK] Данные сохранены в:" << filePath
-             << "| Книг:" << m_books.size() << "| Читателей:" << m_users.size()
-             << "| Выдач:" << m_issueRecords.size();
+    file.close();
+    qDebug() << "Загрузка завершена. Книг:" << loadedBooks << "| Читателей:" << loadedUsers << "| Выдач:" << loadedIssues;
 }
 
 const std::vector<Book>& Catalog::getBooks() const { return m_books; }
@@ -235,156 +271,374 @@ bool Catalog::issueBook(const std::string& bookId, const std::string& userId,
 }
 
 bool Catalog::returnBook(const std::string& bookId, const std::string& returnDate) {
+    // Find the active issue record (book issued and not yet returned)
     auto it = std::find_if(m_issueRecords.begin(), m_issueRecords.end(),
                            [&](const IssueRecord& r){ return r.getBookId() == bookId && r.getReturnDate().empty(); });
     if (it == m_issueRecords.end()) return false;
+    // Update the record with the return date and clear overdue flag
     it->setReturnDate(returnDate);
     it->setIsOverdue(false);
     return true;
 }
 
 const std::vector<IssueRecord>& Catalog::getIssueRecords() const { return m_issueRecords; }
+
 bool Catalog::generateReport(const std::string& filePath) const {
-    std::ofstream file(filePath);
-    if (!file.is_open()) return false;
+    QFile file(QString::fromStdString(filePath));
+    if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) {
+        return false;
+    }
 
-    auto now = QDate::currentDate().toString("dd.MM.yyyy").toStdString();
+    // Используем QTextStream с UTF-8
+    QTextStream out(&file);
+    out.setCodec("UTF-8");
+    out.setGenerateByteOrderMark(true);
 
-    file << "============================================================\n";
-    file << "       ОТЧЁТ ПО БИБЛИОТЕЧНОМУ ФОНДУ\n";
-    file << "       Дата формирования: " << now << "\n";
-    file << "============================================================\n\n";
+    QString now = QDate::currentDate().toString("dd.MM.yyyy");
+
+    // Вспомогательная функция для безопасного преобразования строк
+    auto toQString = [](const std::string& str) -> QString {
+        // Пробуем разные кодировки
+        QString result = QString::fromUtf8(str.c_str());
+        if (result.contains(QChar::ReplacementCharacter)) {
+            // Если есть символы замены, пробуем Windows-1251
+            result = QString::fromLatin1(str.c_str());
+        }
+        return result;
+    };
+
+    out << "============================================================\n";
+    out << "       ОТЧЁТ ПО БИБЛИОТЕЧНОМУ ФОНДУ\n";
+    out << "       Дата формирования: " << now << "\n";
+    out << "============================================================\n\n";
 
     // 1. Общая статистика
     int totalBooks = static_cast<int>(m_books.size());
     int issuedCount = 0;
-    for (const auto& r : m_issueRecords)
+    for (const auto& r : m_issueRecords) {
         if (r.getReturnDate().empty()) ++issuedCount;
+    }
     int availableCount = totalBooks - issuedCount;
 
-    file << "[ ОБЩАЯ СТАТИСТИКА ]\n";
-    file << "  Всего изданий в фонде : " << totalBooks << "\n";
-    file << "  Выдано сейчас         : " << issuedCount << "\n";
-    file << "  Доступно              : " << availableCount << "\n";
-    file << "  Зарегистрировано чит. : " << m_users.size() << "\n";
-    file << "  Всего операций выдачи : " << m_issueRecords.size() << "\n\n";
+    out << "[ ОБЩАЯ СТАТИСТИКА ]\n";
+    out << "  Всего изданий в фонде : " << totalBooks << "\n";
+    out << "  Выдано сейчас         : " << issuedCount << "\n";
+    out << "  Доступно              : " << availableCount << "\n";
+    out << "  Зарегистрировано чит. : " << m_users.size() << "\n";
+    out << "  Всего операций выдачи : " << m_issueRecords.size() << "\n\n";
 
     // 2. Каталог изданий
-    file << "------------------------------------------------------------\n";
-    file << "[ КАТАЛОГ ИЗДАНИЙ ]\n";
-    file << "------------------------------------------------------------\n";
-    file << std::left
-         << std::setw(8)  << "ID"
-         << std::setw(32) << "Название"
-         << std::setw(22) << "Автор"
-         << std::setw(8)  << "Год"
-         << std::setw(16) << "Жанр"
-         << "Статус\n";
-    file << std::string(96, '-') << "\n";
+    out << "------------------------------------------------------------\n";
+    out << "[ КАТАЛОГ ИЗДАНИЙ ]\n";
+    out << "------------------------------------------------------------\n";
+
+    // Форматирование с помощью QString
     for (const auto& b : m_books) {
         bool issued = isBookIssued(b.getBookId());
-        std::string title = b.getTitle().size() > 30 ? b.getTitle().substr(0, 29) + "…" : b.getTitle();
-        std::string author = b.getAuthor().size() > 20 ? b.getAuthor().substr(0, 19) + "…" : b.getAuthor();
-        file << std::left
-             << std::setw(8)  << b.getBookId()
-             << std::setw(32) << title
-             << std::setw(22) << author
-             << std::setw(8)  << b.getYear()
-             << std::setw(16) << b.getGenre()
-             << (issued ? "ВЫДАНА" : "ДОСТУПНА") << "\n";
+        QString id = toQString(b.getBookId());
+        QString title = toQString(b.getTitle());
+        QString author = toQString(b.getAuthor());
+        QString genre = toQString(b.getGenre());
+
+        // Обрезаем длинные строки
+        if (title.length() > 30) title = title.left(29) + "…";
+        if (author.length() > 20) author = author.left(19) + "…";
+
+        // Форматируем вывод
+        out << qSetFieldWidth(8) << id
+            << " " << qSetFieldWidth(30) << title
+            << " " << qSetFieldWidth(20) << author
+            << " " << qSetFieldWidth(6) << b.getYear()
+            << " " << qSetFieldWidth(15) << genre
+            << qSetFieldWidth(0) << " " << (issued ? "ВЫДАНА" : "ДОСТУПНА") << "\n";
     }
-    file << "\n";
+    out << "\n";
 
     // 3. Текущие выдачи
-    file << "------------------------------------------------------------\n";
-    file << "[ ТЕКУЩИЕ ВЫДАЧИ ]\n";
-    file << "------------------------------------------------------------\n";
+    out << "------------------------------------------------------------\n";
+    out << "[ ТЕКУЩИЕ ВЫДАЧИ ]\n";
+    out << "------------------------------------------------------------\n";
     bool hasActive = false;
     for (const auto& r : m_issueRecords) {
         if (!r.getReturnDate().empty()) continue;
         hasActive = true;
-        // найти книгу и пользователя
-        std::string bookTitle = r.getBookId();
-        for (const auto& b : m_books)
-            if (b.getBookId() == r.getBookId()) { bookTitle = b.getTitle(); break; }
-        std::string userName = r.getUserId();
-        for (const auto& u : m_users)
-            if (u.getUserId() == r.getUserId()) { userName = u.getFullName(); break; }
 
-        file << "  Книга    : " << bookTitle << " [" << r.getBookId() << "]\n";
-        file << "  Читатель : " << userName  << " [" << r.getUserId() << "]\n";
-        file << "  Выдана   : " << r.getIssueDate() << "\n";
-        file << "  Вернуть  : " << r.getReturnDate() << "\n";
-        file << "  " << std::string(40, '-') << "\n";
+        // Найти книгу
+        QString bookTitle = toQString(r.getBookId());
+        for (const auto& b : m_books) {
+            if (b.getBookId() == r.getBookId()) {
+                bookTitle = toQString(b.getTitle());
+                break;
+            }
+        }
+
+        // Найти пользователя
+        QString userName = toQString(r.getUserId());
+        for (const auto& u : m_users) {
+            if (u.getUserId() == r.getUserId()) {
+                userName = toQString(u.getFullName());
+                break;
+            }
+        }
+
+        out << "  Книга    : " << bookTitle << " [" << toQString(r.getBookId()) << "]\n";
+        out << "  Читатель : " << userName << " [" << toQString(r.getUserId()) << "]\n";
+        out << "  Выдана   : " << toQString(r.getIssueDate()) << "\n";
+        QString returnDateStr = r.getReturnDate().empty() ? "не возвращена" : toQString(r.getReturnDate());
+        out << "  Вернуть  : " << returnDateStr << "\n";
+        out << "  " << QString(40, '-') << "\n";
     }
-    if (!hasActive) file << "  Нет активных выдач.\n";
-    file << "\n";
+    if (!hasActive) out << "  Нет активных выдач.\n";
+    out << "\n";
 
     // 4. История возвратов
-    file << "------------------------------------------------------------\n";
-    file << "[ ИСТОРИЯ ВОЗВРАТОВ ]\n";
-    file << "------------------------------------------------------------\n";
+    out << "------------------------------------------------------------\n";
+    out << "[ ИСТОРИЯ ВОЗВРАТОВ ]\n";
+    out << "------------------------------------------------------------\n";
     bool hasHistory = false;
     for (const auto& r : m_issueRecords) {
         if (r.getReturnDate().empty()) continue;
         hasHistory = true;
-        std::string bookTitle = r.getBookId();
-        for (const auto& b : m_books)
-            if (b.getBookId() == r.getBookId()) { bookTitle = b.getTitle(); break; }
-        std::string userName = r.getUserId();
-        for (const auto& u : m_users)
-            if (u.getUserId() == r.getUserId()) { userName = u.getFullName(); break; }
 
-        file << "  " << bookTitle << " | " << userName
-             << " | Выд: " << r.getIssueDate()
-             << " | Возвр: " << r.getReturnDate() << "\n";
+        QString bookTitle = toQString(r.getBookId());
+        for (const auto& b : m_books) {
+            if (b.getBookId() == r.getBookId()) {
+                bookTitle = toQString(b.getTitle());
+                break;
+            }
+        }
+
+        QString userName = toQString(r.getUserId());
+        for (const auto& u : m_users) {
+            if (u.getUserId() == r.getUserId()) {
+                userName = toQString(u.getFullName());
+                break;
+            }
+        }
+
+        out << "  " << bookTitle << " | " << userName
+            << " | Выд: " << toQString(r.getIssueDate())
+            << " | Возвр: " << toQString(r.getReturnDate()) << "\n";
     }
-    if (!hasHistory) file << "  История возвратов пуста.\n";
-    file << "\n";
+    if (!hasHistory) out << "  История возвратов пуста.\n";
+    out << "\n";
 
-    file << "============================================================\n";
-    file << "  Конец отчёта\n";
-    file << "============================================================\n";
+    out << "============================================================\n";
+    out << "  Конец отчёта\n";
+    out << "============================================================\n";
 
+    file.close();
     return true;
 }
 
 void Catalog::loadLibrarians() {
-    std::string basePath =
-        QCoreApplication::applicationDirPath().toStdString() + "/../../../";
+    m_librarians.clear();  // Очищаем перед загрузкой
 
-    std::string fullPath = basePath + "librarians.txt";
+    QString path = getLibrariansFilePath();
 
-    std::ifstream file(fullPath);
+    if (!QFileInfo::exists(path)) {
+        qDebug() << "Файл библиотекарей не найден:" << path;
+        qDebug() << "Будет создан новый файл при сохранении";
+        return;
+    }
 
-    if (!file.is_open()) return;
+    std::ifstream file(path.toStdString());
+    if (file.is_open()) {
+        std::string line;
+        while (std::getline(file, line)) {
+            if (!line.empty()) {
+                try {
+                    Librarian lib = Librarian::fromFileString(line);
+                    // Проверка на дубликаты
+                    bool exists = false;
+                    for (const auto& existing : m_librarians) {
+                        if (existing.login() == lib.login()) {
+                            exists = true;
+                            break;
+                        }
+                    }
+                    if (!exists) {
+                        m_librarians.push_back(lib);
+                        qDebug() << "Загружен библиотекарь:" << lib.login().c_str();
+                    }
+                } catch (const std::exception& e) {
+                    qDebug() << "Ошибка парсинга строки:" << line.c_str();
+                }
+            }
+        }
+        file.close();
+    }
 
-    std::string line;
-    while (std::getline(file, line)) {
-        if (!line.empty())
-            m_librarians.push_back(Librarian::fromFileString(line));
+    qDebug() << "Всего загружено библиотекарей:" << m_librarians.size();
+
+    // Если библиотекарей нет, создаем администратора по умолчанию
+    if (m_librarians.empty()) {
+        qDebug() << "Создание библиотекаря по умолчанию (admin/admin)";
+        Librarian defaultAdmin("admin", "admin");
+        m_librarians.push_back(defaultAdmin);
+        saveLibrarians();  // Сохраняем сразу
     }
 }
 
 void Catalog::saveLibrarians() const {
-    std::ofstream file("librarians.txt", std::ios::trunc);
-    for (const auto& l : m_librarians)
-        file << l.toFileString() << "\n";
+    QString path = getLibrariansFilePath();
+
+    qDebug() << "Сохранение библиотекарей в:" << path;
+    qDebug() << "Количество сохраняемых библиотекарей:" << m_librarians.size();
+
+    std::ofstream file(path.toStdString(), std::ios::trunc);
+    if (file.is_open()) {
+        for (const auto& l : m_librarians) {
+            file << l.toFileString() << "\n";
+            qDebug() << "Сохранён библиотекарь:" << l.login().c_str();
+        }
+        file.close();
+        qDebug() << "Сохранение завершено успешно";
+    } else {
+        qDebug() << "ОШИБКА: Не удалось открыть файл для сохранения:" << path;
+    }
 }
 
 bool Catalog::checkLibrarian(const std::string& login, const std::string& password) const {
-    for (const auto& l : m_librarians)
-        if (l.login() == login && l.password() == password)
+    qDebug() << "Проверка библиотекаря - логин:" << login.c_str();
+    qDebug() << "Всего библиотекарей в системе:" << m_librarians.size();
+
+    for (const auto& l : m_librarians) {
+        qDebug() << "Проверяю с:" << l.login().c_str();
+        if (l.login() == login && l.password() == password) {
+            qDebug() << "УСПЕШНО! Найден библиотекарь:" << login.c_str();
             return true;
+        }
+    }
+    qDebug() << "НЕ УСПЕШНО! Библиотекарь не найден:" << login.c_str();
     return false;
 }
 
 void Catalog::addLibrarian(const Librarian& lib) {
+    // Проверяем, существует ли уже такой логин
+    for (const auto& existing : m_librarians) {
+        if (existing.login() == lib.login()) {
+            qDebug() << "Библиотекарь с логином" << lib.login().c_str() << "уже существует!";
+            return;
+        }
+    }
+
+    // Добавляем в список
     m_librarians.push_back(lib);
+    qDebug() << "Добавлен новый библиотекарь:" << lib.login().c_str();
+
+    // Сохраняем обновленный список
     saveLibrarians();
 }
 
 void Catalog::autoSave() {
     saveData();
     saveLibrarians();
+    // also persist separate readers and issues files
+    saveReaders();
+    saveIssues();
+}
+
+// Load readers from dedicated file
+void Catalog::loadReaders() {
+    // Clear existing list to avoid duplicates
+    m_users.clear();
+    // Try to load readers from the standard file; if it does not exist, fall back to the test file.
+    std::string basePath = QCoreApplication::applicationDirPath().toStdString() + "/../../../";
+    std::string fullPath = basePath + LibraryConstants::kReadersFileName;
+    std::ifstream file(fullPath);
+    if (!file.is_open()) {
+        // fallback to test_readers.txt in the same directory
+        std::string testPath = basePath + "test_readers.txt";
+        file.open(testPath);
+        if (!file.is_open()) return; // nothing to load
+    }
+    std::string line;
+    while (std::getline(file, line)) {
+        if (!line.empty())
+            m_users.push_back(User::fromFileString(line));
+    }
+}
+
+// Save readers to dedicated file
+void Catalog::saveUser() const {
+    // Alias for saving readers, kept for backward compatibility
+    saveReaders();
+}
+
+void Catalog::saveReaders() const {
+    std::string basePath = QCoreApplication::applicationDirPath().toStdString() + "/../../../";
+    std::ofstream file(basePath + LibraryConstants::kReadersFileName, std::ios::trunc);
+    for (const auto& u : m_users)
+        file << u.toFileString() << "\n";
+}
+
+// Load issue records from dedicated file
+void Catalog::loadIssueRecords() {
+    // Ensure the issues file exists; if it doesn't, create an empty one
+    std::string basePath = QCoreApplication::applicationDirPath().toStdString() + "/../../../";
+    std::string fullPath = basePath + LibraryConstants::kIssuesFileName;
+    std::ifstream file(fullPath);
+    if (!file.is_open()) {
+        // create empty file
+        std::ofstream create(fullPath);
+        create.close();
+        file.open(fullPath);
+        if (!file.is_open()) return; // give up if still cannot open
+    }
+    std::string line;
+    while (std::getline(file, line)) {
+        if (!line.empty())
+            m_issueRecords.push_back(IssueRecord::fromFileString(line));
+    }
+}
+
+// Save issue records to dedicated file
+void Catalog::saveIssues() const {
+    std::string basePath = QCoreApplication::applicationDirPath().toStdString() + "/../../../";
+    std::ofstream file(basePath + LibraryConstants::kIssuesFileName, std::ios::trunc);
+    for (const auto& i : m_issueRecords)
+        file << i.toFileString() << "\n";
+}
+
+// Simple automatic issuing: give each book to the first reader if not already issued
+void Catalog::autoIssueAllBooksToReaders() {
+    if (m_users.empty()) return;
+    const std::string firstUserId = m_users.front().getUserId();
+    QString today = QDate::currentDate().toString("yyyy-MM-dd");
+    for (const auto& b : m_books) {
+        if (isBookIssued(b.getBookId())) continue;
+        // create issue record with empty return date
+        IssueRecord rec(b.getBookId(), firstUserId, today.toStdString(), "", false);
+        m_issueRecords.push_back(rec);
+    }
+    // persist changes
+    saveIssues();
+    saveData();
+}
+
+void Catalog::debugPrintLibrarians() const {
+    qDebug() << "=================== БИБЛИОТЕКАРИ ===================";
+    qDebug() << "Всего:" << m_librarians.size();
+    for (const auto& l : m_librarians) {
+        qDebug() << "Логин:" << l.login().c_str() << "| Пароль:" << l.password().c_str();
+    }
+    qDebug() << "====================================================";
+
+    // Выводим путь к файлу
+    QString path = getLibrariansFilePath();
+    qDebug() << "Путь к файлу:" << path;
+
+    // Проверяем содержимое файла
+    std::ifstream file(path.toStdString());
+    if (file.is_open()) {
+        qDebug() << "Содержимое файла:";
+        std::string line;
+        while (std::getline(file, line)) {
+            qDebug() << line.c_str();
+        }
+        file.close();
+    } else {
+        qDebug() << "Файл не найден или не открывается!";
+    }
 }

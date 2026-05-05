@@ -30,3 +30,6 @@ HEADERS += \
 
 win32:CONFIG -= console
 QMAKE_CXXFLAGS += -Wall -Wextra -pedantic
+CONFIG += utf8_source
+CODECFORTR = UTF-8
+CODECFORSRC = UTF-8

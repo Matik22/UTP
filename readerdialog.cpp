@@ -118,7 +118,8 @@ void ReaderMenuDialog::onRegisterReader() {
 
     std::string autoId = m_catalog.generateUserId();
     m_catalog.addUser(User(autoId, fullName.trimmed().toStdString(), normalizedPhone.toStdString()));
-
+    // Сохраняем изменения в файл (автосохранение)
+    m_catalog.autoSave();
     outputReader();
     QMessageBox::information(this, "Успех", QString("Читатель зарегистрирован.")
                                                 .arg(QString::fromStdString(autoId)));

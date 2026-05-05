@@ -98,6 +98,10 @@ void MainWindow::setupBooksPage() {
  topLayout->addWidget(m_btnIssueBook);
  QObject::connect(m_btnIssueBook, &QPushButton::clicked, this, &MainWindow::onIssueBook);
 
+    m_btnReturnBook = new QPushButton("Вернуть книгу");
+    topLayout->addWidget(m_btnReturnBook);
+    QObject::connect(m_btnReturnBook, &QPushButton::clicked, this, &MainWindow::onReturnBook);
+
  m_btnChart = new QPushButton("Статистика");
  topLayout->addWidget(m_btnChart);
  QObject::connect(m_btnChart, &QPushButton::clicked, this, &MainWindow::onSwitchToChart);
@@ -342,7 +346,7 @@ void MainWindow::refreshTable() {
  m_sourceModel->removeRows(0, m_sourceModel->rowCount());
  const auto& books = m_catalog.getBooks();
 
- qDebug() << "[DEBUG] В каталоге книг:" << books.size();
+ qDebug() << "В каталоге книг:" << books.size();
 
  if (books.empty()) {
   qDebug() << "[INFO] Каталог пуст.";
@@ -451,7 +455,7 @@ void MainWindow::onRemoveBookById() {
 
 void MainWindow::onSaveData() {
  m_catalog.saveData();
- QMessageBox::information(this, "Успех", "Данные сохранены в library_data.txt");
+ QMessageBox::information(this, "Успех", "Данные сохранены");
 }
 
 void MainWindow::onIssueBook() {
@@ -462,6 +466,22 @@ void MainWindow::onIssueBook() {
 
   QMessageBox::information(this, "Успех", "Книга успешно выдана читателю.");
  }
+}
+
+void MainWindow::onReturnBook() {
+    bool ok;
+    QString bookId = QInputDialog::getText(this, "Возврат книги", "Введите ID книги:", QLineEdit::Normal, "", &ok);
+    if (!ok || bookId.trimmed().isEmpty()) return;
+    QString returnDate = QDate::currentDate().toString("yyyy-MM-dd");
+    if (m_catalog.returnBook(bookId.trimmed().toStdString(), returnDate.toStdString())) {
+        m_catalog.autoSave();
+        refreshTable();
+        // Обновляем список читателей и их историю, чтобы отразить возврат
+        refreshReadersTable();
+        QMessageBox::information(this, "Успех", "Книга возвращена.");
+    } else {
+        QMessageBox::warning(this, "Ошибка", "Не удалось вернуть книгу (возможно, она не выдана).");
+    }
 }
 
 // === Страница статистики ===
@@ -532,10 +552,12 @@ void MainWindow::showReaderHistory(const std::string& userId) {
  m_historyModel->removeRows(0, m_historyModel->rowCount());
  auto history = m_catalog.getUserHistory(userId);
  for (const auto& rec : history) {
+  // Show only currently issued books (returnDate empty)
+  if (!rec.getReturnDate().empty()) continue; // skip returned books
   QList<QStandardItem*> row;
   row << new QStandardItem(QString::fromStdString(rec.getBookId()))
       << new QStandardItem(QString::fromStdString(rec.getIssueDate()))
-      << new QStandardItem(QString::fromStdString(rec.getReturnDate().empty() ? "В обороте" : rec.getReturnDate()))
+      << new QStandardItem("В обороте") // return date is empty => still in circulation
       << new QStandardItem(rec.getIsOverdue() ? "Просрочка" : "В норме");
   m_historyModel->appendRow(row);
  }
@@ -691,6 +713,19 @@ void MainWindow::onImportReaders() {
         "Текстовые файлы (*.txt);;Все файлы (*)"
         );
     if (filename.isEmpty()) return;
+    // Copy selected file to the standard readers file location and load it
+    QString targetPath = QCoreApplication::applicationDirPath() + "/../../../" + LibraryConstants::kReadersFileName;
+    // Remove any existing file to ensure fresh copy
+    QFile::remove(targetPath);
+    if (!QFile::copy(filename, targetPath)) {
+        QMessageBox::warning(this, "Ошибка", "Не удалось скопировать файл читателей.");
+        return;
+    }
+    // Load the newly copied readers file
+    m_catalog.loadReaders();
+    refreshReadersTable();
+    QMessageBox::information(this, "Импорт завершён", "Файл читателей загружен.");
+    return;
 
     QFile file(filename);
     if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {

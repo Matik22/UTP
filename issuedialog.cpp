@@ -31,7 +31,9 @@ void IssueDialog::setupUI() {
 
     m_issueDateEdit = new QDateEdit(this);
     m_issueDateEdit->setCalendarPopup(true);
+    // Use a constant issuance date (today) and make it read‑only to avoid user changes
     m_issueDateEdit->setDate(QDate::currentDate());
+    m_issueDateEdit->setReadOnly(true);
 
     m_returnDateEdit = new QDateEdit(this);
     m_returnDateEdit->setCalendarPopup(true);
@@ -84,9 +86,12 @@ void IssueDialog::onIssueConfirmed() {
         return;
     }
 
+    // Use constant issuance date (today) for consistency
+    QDate issueDate = QDate::currentDate();
+    // Issue a book with empty return date (to be filled when returned)
     bool ok = m_catalog.issueBook(bookId.toStdString(), userId.toStdString(),
-                                  m_issueDateEdit->date().toString("yyyy-MM-dd").toStdString(),
-                                  m_returnDateEdit->date().toString("yyyy-MM-dd").toStdString());
+                                  issueDate.toString("yyyy-MM-dd").toStdString(),
+                                  "");
     if (ok) {
         accept();
     } else {
