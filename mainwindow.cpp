@@ -98,10 +98,6 @@ void MainWindow::setupBooksPage() {
  topLayout->addWidget(m_btnIssueBook);
  QObject::connect(m_btnIssueBook, &QPushButton::clicked, this, &MainWindow::onIssueBook);
 
-    m_btnReturnBook = new QPushButton("Вернуть книгу");
-    topLayout->addWidget(m_btnReturnBook);
-    QObject::connect(m_btnReturnBook, &QPushButton::clicked, this, &MainWindow::onReturnBook);
-
  m_btnChart = new QPushButton("Статистика");
  topLayout->addWidget(m_btnChart);
  QObject::connect(m_btnChart, &QPushButton::clicked, this, &MainWindow::onSwitchToChart);
@@ -147,7 +143,7 @@ void MainWindow::setupBooksPage() {
  mainLayout->addWidget(m_tableView);
 
  QObject::connect(m_btnAdd, &QPushButton::clicked, this, &MainWindow::onAddBook);
- QObject::connect(m_btnSave, &QPushButton::clicked, this, &MainWindow::onSaveData);
+ QObject::connect(m_btnSave, &QPushButton::clicked, this, &MainWindow::onSyncTableCatalog);
 
  m_stack->addWidget(m_booksPage);
 }
@@ -191,6 +187,10 @@ void MainWindow::setupReadersPage() {
  topLayout->addWidget(m_btnDeleteReader);
  QObject::connect(m_btnDeleteReader, &QPushButton::clicked, this, &MainWindow::onRemoveReaderBySurname);
 
+ m_btnSaveReaders = new QPushButton("Сохранить читателей");
+ topLayout->addWidget(m_btnSaveReaders);
+ connect(m_btnSaveReaders, &QPushButton::clicked, this, &MainWindow::onSyncReadersTable);
+
  topLayout->addStretch();
  mainLayout->addLayout(topLayout);
 
@@ -209,7 +209,7 @@ void MainWindow::setupReadersPage() {
 
  m_historyTable = new QTableView();
  m_historyModel = new QStandardItemModel(this);
- m_historyModel->setHorizontalHeaderLabels({"ID книги", "Дата выдачи", "Дата возврата", "Статус"});
+ m_historyModel->setHorizontalHeaderLabels({"ID книги", "Название", "Дата выдачи", "Дата возврата", "Статус"});
  m_historyTable->setModel(m_historyModel);
  m_historyTable->horizontalHeader()->setSectionResizeMode(QHeaderView::Stretch);
  m_historyTable->setAlternatingRowColors(true);
@@ -226,6 +226,11 @@ void MainWindow::setupReadersPage() {
  m_btnImportReaders = new QPushButton("Загрузить читателей");
  topLayout->addWidget(m_btnImportReaders);
  connect(m_btnImportReaders, &QPushButton::clicked, this, &MainWindow::onImportReaders);
+
+ // Вернуть книгу
+ m_btnReturnFromReader = new QPushButton("Вернуть книгу");
+ topLayout->addWidget(m_btnReturnFromReader);
+ QObject::connect(m_btnReturnFromReader, &QPushButton::clicked, this, &MainWindow::onReturnBook);
 }
 
 void MainWindow::setupChartPage() {
@@ -484,6 +489,42 @@ void MainWindow::onReturnBook() {
     }
 }
 
+void MainWindow::onSyncTableCatalog() {
+    if (QMessageBox::question(this, "Подверждение", "Сохранить изменения в каталоге?", QMessageBox::Yes | QMessageBox::No) != QMessageBox::Yes){
+        return;
+    }
+
+    int rows = m_sourceModel->rowCount();\
+        for (int i = 0; i < rows; i++){
+            Book updatedBook(m_sourceModel->item(i, 0)->text().toStdString(), m_sourceModel->item(i, 1)->text().toStdString(), m_sourceModel->item(i, 2)->text().toStdString(), m_sourceModel->item(i, 3)->text().toStdString(), m_sourceModel->item(i, 4)->text().toInt(), m_sourceModel->item(i, 5)->text().toStdString());
+            m_catalog.updateBook(updatedBook);
+        }
+
+        m_catalog.autoSave();
+        QMessageBox::information(this, "Успех", "Изменение сохранены.");
+}
+
+void MainWindow::onSyncReadersTable(){
+    if (QMessageBox::question(this, "Подтверждение", "Сохранить изменения в списке читателей?", QMessageBox::Yes | QMessageBox::No) != QMessageBox::Yes) {
+        return;
+    }
+
+    int rows = m_userModel->rowCount();
+    for (int i = 0; i < rows; i++) {
+        QModelIndex proxyIndex = m_userProxy->index(i, 0);
+        QModelIndex sourceIndex = m_userProxy->mapToSource(proxyIndex);
+
+        QString userId = m_userModel->item(sourceIndex.row(), 0)->text();
+        QString fullName = m_userModel->item(sourceIndex.row(), 1)->text();
+        QString phone = m_userModel->item(sourceIndex.row(), 2)->text();
+
+        m_catalog.updateUser(User(userId.toStdString(), fullName.toStdString(), phone.toStdString()));
+    }
+
+    m_catalog.autoSave();
+    QMessageBox::information(this, "Успех", "Изменения сохранены.");
+}
+
 // === Страница статистики ===
 
 void MainWindow::onChartTypeChanged() {
@@ -551,14 +592,30 @@ void MainWindow::refreshReadersTable() {
 void MainWindow::showReaderHistory(const std::string& userId) {
  m_historyModel->removeRows(0, m_historyModel->rowCount());
  auto history = m_catalog.getUserHistory(userId);
+
+ std::unordered_map<std::string, std::string> bookTitles;
+
+ for(const auto& book : m_catalog.getBooks()) {
+     bookTitles[book.getBookId()] = book.getTitle();
+ }
+
  for (const auto& rec : history) {
-  // Show only currently issued books (returnDate empty)
-  if (!rec.getReturnDate().empty()) continue; // skip returned books
+  if (!rec.getReturnDate().empty()) continue;
+
   QList<QStandardItem*> row;
-  row << new QStandardItem(QString::fromStdString(rec.getBookId()))
+  QString bookId = QString::fromStdString(rec.getBookId());
+  QString bookTitle = QString::fromStdString(bookTitles[rec.getBookId()]);
+
+  row << new QStandardItem(bookId)
+      << new QStandardItem(bookTitle)
       << new QStandardItem(QString::fromStdString(rec.getIssueDate()))
-      << new QStandardItem("В обороте") // return date is empty => still in circulation
+      << new QStandardItem("В обороте")
       << new QStandardItem(rec.getIsOverdue() ? "Просрочка" : "В норме");
+
+  for (int col = 0; col < row.size(); ++col){
+      row[col]->setFlags(row[col]->flags() & ~Qt::ItemIsEditable);
+  }
+
   m_historyModel->appendRow(row);
  }
 }

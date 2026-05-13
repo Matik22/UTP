@@ -31,6 +31,8 @@ public:
     void saveUser() const;
 
     void addBook(const Book& book);
+    void updateBook(const Book& book);
+    void updateUser(const User& user);
     bool removeBook(const std::string& bookId);
     bool removeUser(const std::string& userId);
     const std::vector<Book>& getBooks() const;

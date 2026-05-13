@@ -225,6 +225,24 @@ void Catalog::addBook(const Book& book) {
     }
 }
 
+void Catalog::updateBook(const Book& updatedBook){
+    for (auto& book : m_books) {
+        if (book.getBookId() == updatedBook.getBookId()) {
+            book = updatedBook;
+            return;
+        }
+    }
+}
+
+void Catalog::updateUser(const User& updatedUser) {
+    for(auto& user : m_users){
+        if(user.getUserId() == updatedUser.getUserId()){
+            user = updatedUser;
+            return;
+        }
+    }
+}
+
 void Catalog::addUser(const User& user) {
     if (m_users.size() < LibraryConstants::kMaxUsers) {
         m_users.push_back(user);

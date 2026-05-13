@@ -37,6 +37,8 @@ private slots:
  void onReaderSearchChanged();
  void onRegisterLibrarian();
  void onReturnBook();
+ void onSyncTableCatalog();
+ void onSyncReadersTable();
 
 private:
  void setupUI();
@@ -47,6 +49,7 @@ private:
  void refreshReadersTable();
  void refreshChart();
  void showReaderHistory(const std::string& userId);
+ void syncTableCatalog();
 
  Catalog m_catalog;
  QStackedWidget* m_stack;
@@ -61,7 +64,6 @@ private:
  QPushButton* m_btnReaders;
  QPushButton* m_btnDeleteBook;
  QPushButton* m_btnIssueBook;
- QPushButton* m_btnReturnBook;
  QPushButton* m_btnChart;
  QPushButton* m_btnImport;
  QPushButton* m_btnReport;
@@ -79,6 +81,8 @@ private:
  QPushButton* m_btnRegister;
  QPushButton* m_btnDeleteReader;
  QPushButton* m_btnImportReaders;
+ QPushButton* m_btnReturnFromReader;
+ QPushButton* m_btnSaveReaders;
 
 
  // Страница статистики
