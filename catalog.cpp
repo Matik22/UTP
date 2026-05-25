@@ -12,6 +12,7 @@
 #include <QtCore/qfileinfo.h>
 #include <QFile>
 #include <QTextStream>
+#include <QString>
 
 Catalog::Catalog() {
     loadLibrarians();  // Загружаем библиотекарей при создании
@@ -302,148 +303,130 @@ bool Catalog::returnBook(const std::string& bookId, const std::string& returnDat
 const std::vector<IssueRecord>& Catalog::getIssueRecords() const { return m_issueRecords; }
 
 bool Catalog::generateReport(const std::string& filePath) const {
-    QFile file(QString::fromStdString(filePath));
+    // Переводим std::string пути в родной для Qt QString
+    QString path = QString::fromStdString(filePath);
+
+    // Если путь пустой (например, пользователь отменил диалог), выходим
+    if (path.isEmpty()) return false;
+
+    QFile file(path);
     if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) {
         return false;
     }
 
-    // Используем QTextStream с UTF-8
     QTextStream out(&file);
+    // Для Qt 5 используем setCodec, чтобы не было кракозябр
     out.setCodec("UTF-8");
-    out.setGenerateByteOrderMark(true);
 
-    QString now = QDate::currentDate().toString("dd.MM.yyyy");
+    QDate today = QDate::currentDate();
 
-    // Вспомогательная функция для безопасного преобразования строк
-    auto toQString = [](const std::string& str) -> QString {
-        // Пробуем разные кодировки
-        QString result = QString::fromUtf8(str.c_str());
-        if (result.contains(QChar::ReplacementCharacter)) {
-            // Если есть символы замены, пробуем Windows-1251
-            result = QString::fromLatin1(str.c_str());
+    /* ---------- сбор статистики ---------- */
+    int totalBooks = m_books.size();
+    int activeIssues = 0;
+    int overdueCount = 0;
+
+    // Посчитаем количество активных выдач на текущий момент (где книга еще не возвращена)
+    // Предполагаем, что у пустой записи возврата пустая строка "" или специальный маркер
+    for (const auto& record : m_issueRecords) {
+        if (record.getReturnDate().empty()) {
+            activeIssues++;
+            if (record.getIsOverdue()) {
+                overdueCount++;
+            }
         }
-        return result;
-    };
-
-    out << "============================================================\n";
-    out << "       ОТЧЁТ ПО БИБЛИОТЕЧНОМУ ФОНДУ\n";
-    out << "       Дата формирования: " << now << "\n";
-    out << "============================================================\n\n";
-
-    // 1. Общая статистика
-    int totalBooks = static_cast<int>(m_books.size());
-    int issuedCount = 0;
-    for (const auto& r : m_issueRecords) {
-        if (r.getReturnDate().empty()) ++issuedCount;
     }
-    int availableCount = totalBooks - issuedCount;
+    int availableBooks = totalBooks - activeIssues;
 
-    out << "[ ОБЩАЯ СТАТИСТИКА ]\n";
-    out << "  Всего изданий в фонде : " << totalBooks << "\n";
-    out << "  Выдано сейчас         : " << issuedCount << "\n";
-    out << "  Доступно              : " << availableCount << "\n";
-    out << "  Зарегистрировано чит. : " << m_users.size() << "\n";
-    out << "  Всего операций выдачи : " << m_issueRecords.size() << "\n\n";
+    // Распределение книг по жанрам (для статистики)
+    QMap<QString, int> genreCount;
+    // ТОП-5 самых активных читателей (по количеству взятых когда-либо книг)
+    QMap<QString, int> readerActivity;
 
-    // 2. Каталог изданий
-    out << "------------------------------------------------------------\n";
-    out << "[ КАТАЛОГ ИЗДАНИЙ ]\n";
-    out << "------------------------------------------------------------\n";
+    for (const auto& book : m_books) {
+        genreCount[QString::fromStdString(book.getGenre())]++;
+    }
 
-    // Форматирование с помощью QString
-    for (const auto& b : m_books) {
-        bool issued = isBookIssued(b.getBookId());
-        QString id = toQString(b.getBookId());
-        QString title = toQString(b.getTitle());
-        QString author = toQString(b.getAuthor());
-        QString genre = toQString(b.getGenre());
+    for (const auto& record : m_issueRecords) {
+        readerActivity[QString::fromStdString(record.getUserId())]++;
+    }
 
-        // Обрезаем длинные строки
-        if (title.length() > 30) title = title.left(29) + "…";
-        if (author.length() > 20) author = author.left(19) + "…";
+    /* ---------- вывод отчёта ---------- */
+    out << "═══════════════════════════════════════════════════════\n";
+    out << "         АНАЛИТИЧЕСКИЙ ОТЧЁТ ПО БИБЛИОТЕКЕ\n";
+    out << "═══════════════════════════════════════════════════════\n";
+    out << "Дата формирования: " << today.toString("dd.MM.yyyy") << "\n";
+    out << "Всего книг в фонде: " << totalBooks << "\n\n";
 
-        // Форматируем вывод
-        out << qSetFieldWidth(8) << id
-            << " " << qSetFieldWidth(30) << title
-            << " " << qSetFieldWidth(20) << author
-            << " " << qSetFieldWidth(6) << b.getYear()
-            << " " << qSetFieldWidth(15) << genre
-            << qSetFieldWidth(0) << " " << (issued ? "ВЫДАНА" : "ДОСТУПНА") << "\n";
+    out << "─── ОБЩАЯ СТАТИСТИКА ─────────────────────────────────\n";
+    out << QString("Доступно книг:      %1 шт.\n").arg(availableBooks);
+    out << QString("Выдано на руки:     %1 шт.\n").arg(activeIssues);
+    out << QString("Из них в просрочке: %1 шт.\n").arg(overdueCount);
+    out << QString("Зарегистрировано читателей: %1\n\n").arg(m_users.size());
+
+    out << "─── КАТАЛОГ ИЗДАНИЙ ──────────────────────────────────\n";
+    out << "ID     | Название книги               | Автор               | Год  | Жанр           | Статус\n";
+    out << "────────────────────────────────────────────────────────────────────────────────────────────\n";
+
+    for (const auto& book : m_books) {
+        QString bookId = QString::fromStdString(book.getBookId());
+        QString title = QString::fromStdString(book.getTitle());
+        QString author = QString::fromStdString(book.getAuthor());
+        QString genre = QString::fromStdString(book.getGenre());
+
+        // Проверяем статус через вашу существующую функцию
+        bool issued = isBookIssued(book.getBookId());
+        QString status = issued ? "ВЫДАНА" : "ДОСТУПНА";
+
+        // Выравнивание строк средствами Qt (.arg с отрицательной шириной)
+        out << QString("%1 | %2 | %3 | %4 | %5 | %6\n")
+                   .arg(bookId, -6)
+                   .arg(title.left(28), -28)   // Ограничиваем длину, чтобы таблица не разъезжалась
+                   .arg(author.left(19), -19)
+                   .arg(book.getYear(), -4)
+                   .arg(genre.left(14), -14)
+                   .arg(status);
     }
     out << "\n";
 
-    // 3. Текущие выдачи
-    out << "------------------------------------------------------------\n";
-    out << "[ ТЕКУЩИЕ ВЫДАЧИ ]\n";
-    out << "------------------------------------------------------------\n";
-    bool hasActive = false;
-    for (const auto& r : m_issueRecords) {
-        if (!r.getReturnDate().empty()) continue;
-        hasActive = true;
-
-        // Найти книгу
-        QString bookTitle = toQString(r.getBookId());
-        for (const auto& b : m_books) {
-            if (b.getBookId() == r.getBookId()) {
-                bookTitle = toQString(b.getTitle());
-                break;
-            }
-        }
-
-        // Найти пользователя
-        QString userName = toQString(r.getUserId());
-        for (const auto& u : m_users) {
-            if (u.getUserId() == r.getUserId()) {
-                userName = toQString(u.getFullName());
-                break;
-            }
-        }
-
-        out << "  Книга    : " << bookTitle << " [" << toQString(r.getBookId()) << "]\n";
-        out << "  Читатель : " << userName << " [" << toQString(r.getUserId()) << "]\n";
-        out << "  Выдана   : " << toQString(r.getIssueDate()) << "\n";
-        QString returnDateStr = r.getReturnDate().empty() ? "не возвращена" : toQString(r.getReturnDate());
-        out << "  Вернуть  : " << returnDateStr << "\n";
-        out << "  " << QString(40, '-') << "\n";
+    out << "─── РАСПРЕДЕЛЕНИЕ ФОНДА ПО ЖАНРАМ ────────────────────\n";
+    for (auto it = genreCount.begin(); it != genreCount.end(); ++it) {
+        double percentage = totalBooks > 0 ? (double(it.value()) / totalBooks) * 100.0 : 0.0;
+        out << QString("%1: %2 шт. (%3%)\n")
+                   .arg(it.key(), -20)
+                   .arg(it.value(), 4)
+                   .arg(QString::number(percentage, 'f', 1));
     }
-    if (!hasActive) out << "  Нет активных выдач.\n";
     out << "\n";
 
-    // 4. История возвратов
-    out << "------------------------------------------------------------\n";
-    out << "[ ИСТОРИЯ ВОЗВРАТОВ ]\n";
-    out << "------------------------------------------------------------\n";
-    bool hasHistory = false;
-    for (const auto& r : m_issueRecords) {
-        if (r.getReturnDate().empty()) continue;
-        hasHistory = true;
-
-        QString bookTitle = toQString(r.getBookId());
-        for (const auto& b : m_books) {
-            if (b.getBookId() == r.getBookId()) {
-                bookTitle = toQString(b.getTitle());
-                break;
-            }
-        }
-
-        QString userName = toQString(r.getUserId());
-        for (const auto& u : m_users) {
-            if (u.getUserId() == r.getUserId()) {
-                userName = toQString(u.getFullName());
-                break;
-            }
-        }
-
-        out << "  " << bookTitle << " | " << userName
-            << " | Выд: " << toQString(r.getIssueDate())
-            << " | Возвр: " << toQString(r.getReturnDate()) << "\n";
+    out << "─── ТОП ЧИТАТЕЛЕЙ ПО АКТИВНОСТИ ──────────────────────\n";
+    QList<QPair<QString, int>> topReaders;
+    for (auto it = readerActivity.begin(); it != readerActivity.end(); ++it) {
+        topReaders.append({it.key(), it.value()});
     }
-    if (!hasHistory) out << "  История возвратов пуста.\n";
-    out << "\n";
+    // Сортировка по убыванию активности
+    std::sort(topReaders.begin(), topReaders.end(),
+              [](const auto &a, const auto &b){ return a.second > b.second; });
 
-    out << "============================================================\n";
-    out << "  Конец отчёта\n";
-    out << "============================================================\n";
+    for (int i = 0; i < qMin(5, topReaders.size()); ++i) {
+        // Ищем имя пользователя по его ID
+        QString userName = "Неизвестный читатель";
+        for (const auto& user : m_users) {
+            if (user.getUserId() == topReaders[i].first.toStdString()) {
+                // ТАК НАДО: используем getFullName() вместо getName()
+                userName = QString::fromStdString(user.getFullName());
+                break;
+            }
+        }
+        out << QString("%1. ID: %2 | %3 | Взято книг: %4\n")
+                   .arg(i + 1)
+                   .arg(topReaders[i].first, -5)
+                   .arg(userName.left(30), -30) // Ограничим длину имени для ровной таблицы
+                   .arg(topReaders[i].second, 3);
+    }
+
+    out << "\n═══════════════════════════════════════════════════════\n";
+    out << "                    Конец отчёта\n";
+    out << "═══════════════════════════════════════════════════════\n";
 
     file.close();
     return true;
